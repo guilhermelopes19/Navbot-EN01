@@ -19,7 +19,7 @@ typedef struct {
 }Wrobot;
 
 extern Wrobot wrobot;
-
+extern char SN[];
 // Enumeration of robot motion states
 typedef enum {
 	FORWARD = 0, 	

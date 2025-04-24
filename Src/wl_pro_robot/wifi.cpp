@@ -1,12 +1,12 @@
 #include "wifi.h"
-
+#include "robot.h"
 // Configure the relevant parameters of the AP (hotspot) mode
-const char *AP_SSID = "WLROBOT"; 
+const char AP_SSID[] = "navbot-en01-"; 
 const char *AP_PSW = "12345678";    
 
 IPAddress AP_IP(192, 168, 1, 11); 
-IPAddress AP_GATEWAY(192, 168, 1, 11); 
-IPAddress AP_SUBNET(255, 255, 255, 0); 
+IPAddress AP_GATEWAY(192, 168, 1, 11);
+IPAddress AP_SUBNET(255, 255, 255, 0);
 
 
 // Configure the relevant parameters of the STA mode
@@ -17,9 +17,11 @@ char *sta_password = "mujitech";
 
 void WiFi_SetAP(void)
 {
+  char AP_SSID_NAME[20]={0};
+  sprintf(AP_SSID_NAME, "%s%s", AP_SSID, SN);
 	WiFi.mode(WIFI_AP); 
 	WiFi.softAPConfig(AP_IP, AP_GATEWAY, AP_SUBNET); 
-	WiFi.softAP(AP_SSID, AP_PSW); 
+	WiFi.softAP(AP_SSID_NAME, AP_PSW); 
 	// Serial.println();
 	// Serial.print("AP IP address = ");
 	// Serial.println(WiFi.softAPIP());

@@ -1,6 +1,6 @@
 
 #include "robot.h"
-
+char SN[7] = "fcn5fg";
 Wrobot wrobot;
 RobotProtocol::RobotProtocol(uint8_t len)
 {
