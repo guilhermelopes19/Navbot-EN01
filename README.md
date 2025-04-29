@@ -5,7 +5,7 @@
 
 | Real Robot        | 3D Design        |
 | ------------ | ------------ |
-| <img src="Docs/Image/RobotReal.jpg" alt="Image 1" height="200"/> | <img src="Docs/Image/未命名.png" alt="Image 2" height="200"/> |
+| <img src="Docs/Image/DSC_3893.JPG" alt="Image 1" height="200"/> | <img src="Docs/Image/未命名.png" alt="Image 2" height="200"/> |
 
 ### Mechanical Structure Documentation
 
