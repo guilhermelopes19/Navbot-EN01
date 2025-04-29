@@ -1,11 +1,11 @@
 # NavBot-EN01 Wheeled_leg-Robot
 > **The tabletop the tabletop robot**
 >
-> Vedio:[....](......)
+> [![视频封面](https://img.youtube.com/vi/BdTU3AwrqLI/0.jpg)](https://www.youtube.com/watch?v=BdTU3AwrqLI)
 
 | Real Robot        | 3D Design        |
 | ------------ | ------------ |
-| <img src="Docs/Image/RobotReal.jpg" alt="Image 1" height="200"/> | <img src="Docs/Image/未命名.png" alt="Image 2" height="200"/> |
+| <img src="Docs/Image/DSC_3893.JPG" alt="Image 1" height="200"/> | <img src="Docs/Image/未命名.png" alt="Image 2" height="200"/> |
 
 ### Mechanical Structure Documentation
 
