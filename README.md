@@ -1,11 +1,7 @@
 # NavBot-EN01 Wheeled_leg-Robot
 > **The tabletop the tabletop robot**
 >
-> <iframe width="560" height="315"
-  src="https://www.youtube.com/embed/BdTU3AwrqLI"
-  frameborder="0"
-  allowfullscreen>
-</iframe>
+> [![视频封面](https://img.youtube.com/vi/BdTU3AwrqLI/0.jpg)](https://www.youtube.com/watch?v=BdTU3AwrqLI)
 
 | Real Robot        | 3D Design        |
 | ------------ | ------------ |
