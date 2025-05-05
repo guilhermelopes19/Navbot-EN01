@@ -7,7 +7,7 @@
 | ------------ | ------------ |
 | <img src="Docs/Image/DSC_3893.JPG" alt="Image 1" height="200"/> | <img src="Docs/Image/未命名.png" alt="Image 2" height="200"/> |
 
-[Physical Demo Showcase​](https://www.bilibili.com/video/BV1xxxxxx/)  
+[Physical Demo Showcase​](https://www.youtube.com/watch?v=H16f_6Kxv-E)  
 
 
 ### Mechanical Structure Documentation
