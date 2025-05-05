@@ -22,7 +22,7 @@
 * The servo debugging board combines two UART serial lines into one signal line using time-division multiplexing for data transmission and reception.
 * Three GH1.25 4PIN double-ended cables which need to be purchased separately，with a recommended length of 15cm. 
 
-| Wire Connection | 
+| Wire purchase link | 
 | ------------ |
 | <img src="Docs/Image/Connnection.png" height="200"/> |
 
