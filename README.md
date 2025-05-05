@@ -22,7 +22,7 @@
 * The servo debugging board combines two UART serial lines into one signal line using time-division multiplexing for data transmission and reception.
 * Three GH1.25 4PIN double-ended cables which need to be purchased separately，with a recommended length of 15cm. 
 
-| Connection  | 
+| Wire Connection | 
 | ------------ |
 | <img src="Docs/Image/Connection.png" height="500"/> |
 
@@ -37,6 +37,7 @@
 
 ### Usage Instructions
 
+
 1. Connect the battery's XH2.54 plug to the rear interface of the main control board and turn on the switch to power the robot.
 2. A red light on the main board will indicate that the power is on.
 3. The wheels will start FOC motor initialization, with the wheels moving slightly and the legs starting to move.
@@ -44,6 +45,7 @@
 5. After this process is complete, press the EN button on the main control board to restart, and you can then connect to the robot's WiFi network starting with WL. The password is the lowercase WiFi name.
 6. Open a browser connected to the robot's WiFi network and navigate to 192.168.1.11. The remote control interface is compatible with Android, iOS, Windows, Linux, macOS, etc., and it is recommended to use Chrome or Firefox.
 7. Manually stabilize the robot, with the wheels slightly touching the ground. Click the "Robot go!" button on the web page, and the robot will stand up. You can then control the robot's movement using the joystick.
+
 
 ### Guidance Viedeos & Blog
 Video1:[Building Your Own ESP32 Two Wheel-Legs Robot: Project Preview & Introduction​](https://www.youtube.com/watch?v=BdTU3AwrqLI)

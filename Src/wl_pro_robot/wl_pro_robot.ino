@@ -14,6 +14,9 @@
 #include "robot.h"
 #include "wifi.h"
 #include "esp_adc_cal.h"
+#include "ble.h"
+
+#define  botName "navbot_en01-"
 
 /************Instance definition*************/
 
@@ -130,7 +133,8 @@ static const adc_unit_t unit = ADC_UNIT_1;
 void setup() {
   Serial.begin(115200);
   Serial2.begin(1000000);
-  WiFi_SetAP();
+  ble_init(botName);
+  WiFi_SetAP(botName);
   // set_sta_wifi();      // ESP-01S STA mode
   webserver.begin();
   webserver.on("/", HTTP_GET, basicWebCallback);
@@ -236,6 +240,7 @@ void setup() {
 void loop() {
   bat_check();        //Voltage detection
   web_loop();         //Web data update
+  ble_data_processing();
   mpu6050.update();   //IMU data update
   lqr_balance_loop(); //lqr self-balancing control
   yaw_loop();         //yaw axis steering control
@@ -415,7 +420,7 @@ void leg_loop(){
 
 //Jump control
 void jump_loop(){
-  if( (wrobot.dir_last == 5) && (wrobot.dir == 4) && (jump_flag == 0) )
+  if( (wrobot.dir_last == STOP) && (wrobot.dir == JUMP) && (jump_flag == 0) )
   {
       ACC[0] = 0;
       ACC[1] = 0;
@@ -561,4 +566,48 @@ void bat_check()
   }
   else
     bat_check_num++;
+}
+void ble_data_processing(void)
+{
+  if(ble_rx.state == 1)
+  {
+    if((ble_rx.data.header[0] == 0x55) && (ble_rx.data.header[1] == 0xAA) )
+    {
+      StaticJsonDocument<300> doc;
+      char jsonBuffer[300];
+      doc["roll"]     = ble_rx.data.roll;
+      doc["height"]   = ble_rx.data.height;
+
+      int16_t linear;
+      linear = (int16_t)((ble_rx.data.linear_H << 8) | ble_rx.data.linear_L);
+      doc["linear"]   = linear;
+      doc["angular"]  = ble_rx.data.angular;
+      doc["stable"]   = ble_rx.data.stable;
+      doc["mode"]     = "basic";//ble_rx.data.mode;
+      switch(ble_rx.data.dir)
+      {
+        case 0:  doc["dir"]      = "stop";     break;
+        case 1:  doc["dir"]      = "jump";     break;
+        case 2:  doc["dir"]      = "forward";  break;
+        case 3:  doc["dir"]      = "back";     break;
+        case 4:  doc["dir"]      = "left";     break;
+        case 5:  doc["dir"]      = "right";    break;
+      }
+      doc["joy_y"]    = ble_rx.data.joy_y;
+      doc["joy_x"]    = ble_rx.data.joy_x;
+
+      serializeJson(doc, jsonBuffer);
+      Serial.println(jsonBuffer);
+
+      String mode_str = doc["mode"];
+      if(mode_str == "basic")
+      {
+        rp.parseBasic(doc);
+      }
+      ble_send_data((uint8_t*)(&ble_rx.data), 20);
+      ble_rx.state = 0;
+
+    }
+    
+  }
 }
