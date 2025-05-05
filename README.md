@@ -1,7 +1,4 @@
 # NavBot-EN01 Wheeled_leg-Robot
-> **The tabletop robot**
->
-> [![视频封面](https://img.youtube.com/vi/BdTU3AwrqLI/0.jpg)](https://www.youtube.com/watch?v=BdTU3AwrqLI)
 
 | Real Robot        | 3D Design        |
 | ------------ | ------------ |
@@ -24,9 +21,10 @@
 * The IMU used is the MPU6050 module, which shares the same I2C interface with the right-side encoder.
 * The servo debugging board combines two UART serial lines into one signal line using time-division multiplexing for data transmission and reception.
 * Three GH1.25 4PIN double-ended cables which need to be purchased separately，with a recommended length of 15cm. 
+
 | Wire Connection | 
 | ------------ |
-| <img src="4.Docs/Image/Connection.png" alt="Image 3" height="500"/> |
+| <img src="Docs/Image/Connection.png" height="500"/> |
 
 ### Source Code Usage
 
@@ -39,16 +37,22 @@
 
 ### Usage Instructions
 
-* 1. Connect the battery's XH2.54 plug to the rear interface of the main control board and turn on the switch to power the robot.
-* 2. A red light on the main board will indicate that the power is on.
-* 3. The wheels will start FOC motor initialization, with the wheels moving slightly and the legs starting to move.
-* 4. If the battery charge is sufficient, the blue LED on the main control board will light up. If it does not light up, charging is needed.
-* 5. After this process is complete, press the EN button on the main control board to restart, and you can then connect to the robot's WiFi network starting with WL. The password is the lowercase WiFi name.
-* 6. Open a browser connected to the robot's WiFi network and navigate to 192.168.1.11. The remote control interface is compatible with Android, iOS, Windows, Linux, macOS, etc., and it is recommended to use Chrome or Firefox.
-* 7. Manually stabilize the robot, with the wheels slightly touching the ground. Click the "Robot go!" button on the web page, and the robot will stand up. You can then control the robot's movement using the joystick.
+
+1. Connect the battery's XH2.54 plug to the rear interface of the main control board and turn on the switch to power the robot.
+2. A red light on the main board will indicate that the power is on.
+3. The wheels will start FOC motor initialization, with the wheels moving slightly and the legs starting to move.
+4. If the battery charge is sufficient, the blue LED on the main control board will light up. If it does not light up, charging is needed.
+5. After this process is complete, press the EN button on the main control board to restart, and you can then connect to the robot's WiFi network starting with WL. The password is the lowercase WiFi name.
+6. Open a browser connected to the robot's WiFi network and navigate to 192.168.1.11. The remote control interface is compatible with Android, iOS, Windows, Linux, macOS, etc., and it is recommended to use Chrome or Firefox.
+7. Manually stabilize the robot, with the wheels slightly touching the ground. Click the "Robot go!" button on the web page, and the robot will stand up. You can then control the robot's movement using the joystick.
 
 
+### Guidance Viedeos & Blog
+Video1:[Building Your Own ESP32 Two Wheel-Legs Robot: Project Preview & Introduction​](https://www.youtube.com/watch?v=BdTU3AwrqLI)
 
+video2:[DIY Education Nano 01 - Modular Wheel-Leg Robot for STEM​]( https://www.youtube.com/watch?v=cPD-h2ZjIqo )
+ 
+Blog:[Building a Tabletop Wheel-Legged Robot from Scratch​](https://frankfu.blog/embodied-ai-robot/building-a-tabletop-wheel-legged-robot-from-scratch/)  
 
 
 
