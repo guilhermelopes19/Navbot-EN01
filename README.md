@@ -24,6 +24,7 @@
 * The IMU used is the MPU6050 module, which shares the same I2C interface with the right-side encoder.
 * The servo debugging board combines two UART serial lines into one signal line using time-division multiplexing for data transmission and reception.
 * Three GH1.25 4PIN double-ended cables which need to be purchased separately，with a recommended length of 15cm. 
+
 | Wire Connection | 
 | ------------ |
 | <img src="4.Docs/Image/Connection.png" alt="Image 3" height="500"/> |
