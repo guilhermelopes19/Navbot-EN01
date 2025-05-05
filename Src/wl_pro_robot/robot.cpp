@@ -25,7 +25,7 @@ RobotProtocol::~RobotProtocol()
 void RobotProtocol::spinOnce(void)
 {
     int flag = checkBufRefresh();
-    if(flag) 
+    if(flag)
     {
         //UART_WriteBuf(); //This will convert the control information on the web end into a serial port protocol for transmission
 
@@ -86,19 +86,19 @@ void RobotProtocol::parseBasic(StaticJsonDocument<300> &doc)
         _now_buf[3] = STOP;
         wrobot.dir = STOP;  
     } else {
-        if(dir == "jump") {      	
+        if(dir == "jump") {
             _now_buf[3] = JUMP;
             wrobot.dir = JUMP;
-        }else if(dir == "forward") { 
-            _now_buf[3] = FORWARD; 
+        }else if(dir == "forward") {
+            _now_buf[3] = FORWARD;
             wrobot.dir = FORWARD;
-        }else if(dir == "back") { 	
-            _now_buf[3] = BACK; 
+        }else if(dir == "back") {
+            _now_buf[3] = BACK;
             wrobot.dir = BACK;
-        }else if(dir == "left") { 	
+        }else if(dir == "left") {
             _now_buf[3] = LEFT;
             wrobot.dir = LEFT;
-        }else if(dir == "right") { 
+        }else if(dir == "right") {
             _now_buf[3] = RIGHT;
             wrobot.dir = RIGHT;
         }else{
