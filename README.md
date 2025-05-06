@@ -6,6 +6,8 @@
 
 [Physical Demo Showcase​](https://www.youtube.com/watch?v=H16f_6Kxv-E)  
 
+[3D Demo Showcase​](https://www.youtube.com/watch?v=OKktbMr_LOk)  
+
 
 ### Mechanical Structure Documentation
 
@@ -47,12 +49,10 @@
 7. Manually stabilize the robot, with the wheels slightly touching the ground. Click the "Robot go!" button on the web page, and the robot will stand up. You can then control the robot's movement using the joystick.
 
 
-### Guidance Viedeos & Blog
-Video1:[Building Your Own ESP32 Two Wheel-Legs Robot: Project Preview & Introduction​](https://www.youtube.com/watch?v=BdTU3AwrqLI)
+### Guidance Viedeo & Blog
+Video: [Building Your Own ESP32 Two Wheel-Legs Robot: Project Preview & Introduction​](https://www.youtube.com/watch?v=BdTU3AwrqLI)
 
-video2:[DIY Education Nano 01 - Modular Wheel-Leg Robot for STEM​]( https://www.youtube.com/watch?v=cPD-h2ZjIqo )
- 
-Blog:[Building a Tabletop Wheel-Legged Robot from Scratch​](https://frankfu.blog/embodied-ai-robot/building-a-tabletop-wheel-legged-robot-from-scratch/)  
+Blog:  [Building a Tabletop Wheel-Legged Robot from Scratch​](https://frankfu.blog/embodied-ai-robot/building-a-tabletop-wheel-legged-robot-from-scratch/)  
 
 
 
