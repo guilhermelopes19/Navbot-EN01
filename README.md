@@ -50,7 +50,7 @@
 
 
 ### Guidance Viedeo & Blog
-Video: [Building Your Own ESP32 Two Wheel-Legs Robot: Project Preview & Introduction​](https://www.youtube.com/watch?v=BdTU3AwrqLI)
+Video: [DIY Education Nano 01 - Modular Wheel-Leg Robot for STEM​](https://www.youtube.com/watch?v=cPD-h2ZjIqo)
 
 Blog:  [Building a Tabletop Wheel-Legged Robot from Scratch​](https://frankfu.blog/embodied-ai-robot/building-a-tabletop-wheel-legged-robot-from-scratch/)  
 
