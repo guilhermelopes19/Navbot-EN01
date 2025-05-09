@@ -54,7 +54,7 @@ Video: [DIY Education Nano 01 - Modular Wheel-Leg Robot for STEM​](https://www
 
 Blog:  [Building a Tabletop Wheel-Legged Robot from Scratch​](https://frankfu.blog/embodied-ai-robot/building-a-tabletop-wheel-legged-robot-from-scratch/)  
 
-Thanks for Mu Shibo & Li Yufeng：The originally repository https://github.com/MuShibo/Micro-Wheeled_leg-Robot
+Thanks for Mu Shibo & Li Yufeng：The original repository https://github.com/MuShibo/Micro-Wheeled_leg-Robot
 
 
 
