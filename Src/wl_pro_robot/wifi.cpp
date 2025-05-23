@@ -1,45 +1,69 @@
 #include "wifi.h"
 #include "robot.h"
-// Configure the relevant parameters of the AP (hotspot) mode
-const char *AP_PSW = "12345678";
+#include "EEPROM.h"
+#include "define.h"
 
-IPAddress AP_IP(192, 168, 1, 11); 
-IPAddress AP_GATEWAY(192, 168, 1, 11);
-IPAddress AP_SUBNET(255, 255, 255, 0);
-
-
-// Configure the relevant parameters of the STA mode
-char *sta_ssid = "MUJITECH";
-char *sta_password = "mujitech";
-
-
-
-void WiFi_SetAP(char* botName)
-{
-  char AP_SSID_NAME[20]={0};
-  sprintf(AP_SSID_NAME, "%s%s", botName, SN);
-	WiFi.mode(WIFI_AP);
-	WiFi.softAPConfig(AP_IP, AP_GATEWAY, AP_SUBNET);
-	WiFi.softAP(AP_SSID_NAME, AP_PSW);
-	// Serial.println();
-	// Serial.print("AP IP address = ");
-	// Serial.println(WiFi.softAPIP());
-}
-
-
+char wifi_ssid[50]={0};
+char wifi_password[30]={0};
+char eeprom_once=0;
 // ESP-01S access the WiFi network in AP mode
 void set_sta_wifi()
 {
-
-  WiFi.begin(sta_ssid, sta_password);
-  // Wait for connection
-  while(WiFi.status()!=WL_CONNECTED)
+  if(eeprom_once == 0)
   {
-    //Serial.print(".");
-    delay(500);
+    eeprom_once = 1;
+    if(!EEPROM.begin(100))
+    {
+      Serial.printf("error! eeprom init false \r\n");
+      return;
+    }
   }
-  // Print the IP address of ESP-01S
-  Serial.println("");
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
+  
+  //Read the wifi information
+  EEPROM.readString(ADDR_WIFI_SSID,wifi_ssid,50);  
+  EEPROM.readString(ADDR_WIFI_PASSWORD,wifi_password,30);  
+
+  Serial.printf("wifi:%s \r\n",wifi_ssid);
+  Serial.printf("pswd:%s \r\n",wifi_password);
+
+  WiFi.setHostname("navbot-en01-123456");
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(wifi_ssid,wifi_password);
+  Serial.printf("connect %s...\r\n",wifi_ssid);
+
 }
+void wifi_init(void)
+{
+  set_sta_wifi();
+}
+void wifi_loop(void)
+{
+  static char wifi_status = 0;
+  static char connect_count_down = 10;
+
+//If the wifi is not connected, it will actively connect every 10 seconds
+  if(WiFi.status()!=WL_CONNECTED)  
+  {
+    connect_count_down --;
+    if(connect_count_down == 0)
+    {
+      set_sta_wifi();
+      connect_count_down = 10;
+    }
+    wifi_status = 0;
+    
+  }
+  else //Print the IP information once when connecting via wifi
+  {
+    connect_count_down = 1;
+    if(wifi_status == 0)
+    {
+      // Print the IP address of ESP-01S
+      Serial.print("IP Address: ");
+      Serial.println(WiFi.localIP());
+    }
+    wifi_status = 1;
+  }
+  
+}
+

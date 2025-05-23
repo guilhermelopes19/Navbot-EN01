@@ -18,8 +18,7 @@ typedef struct {
   bool go;
 }Wrobot;
 
-extern Wrobot wrobot;
-extern char SN[];
+
 // Enumeration of robot motion states
 typedef enum {
 	FORWARD = 0, 	
@@ -51,3 +50,6 @@ class RobotProtocol
 		void UART_WriteBuf(void);
 		int checkBufRefresh(void);
 };
+
+extern Wrobot wrobot;
+extern RobotProtocol rp;

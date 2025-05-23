@@ -4,6 +4,9 @@
 #include <BLE2902.h>
 #include <ArduinoJson.h>
 #include "ble.h"
+#include "EEPROM.h"
+#include "robot.h"
+#include "define.h"
 
 BLEServer *pServer = NULL;
 BLECharacteristic * pTxCharacteristic;
@@ -17,38 +20,38 @@ BleDataTypDef ble_rx;
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
 
-#define SERVICE_UUID           "6E400011-B5A3-F393-E0A9-E50E24DCCA9E" // UART service UUID
+#define SERVICE_UUID           "6E400011-B5A3-F393-E0A9-E50E24DCCA9E" 
 #define CHARACTERISTIC_UUID_RX "6E400012-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID_TX "6E400013-B5A3-F393-E0A9-E50E24DCCA9E"
 
+
+void ble_rx_data_clear(void);
+void ble_cmd_maneuver_processing(void);
+void ble_cmd_wifi_processing(void);
+
+
+
 class MyCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
-    uint8_t* rxData = pCharacteristic->getData();
-    ble_rx.state = 1;
-    if (pCharacteristic->getLength() == 20)
-    {
-        ble_rx.data.header[0]  = *(rxData+0);
-        ble_rx.data.header[1]  = *(rxData+1);
-        ble_rx.data.idle1[0]   = *(rxData+2);
-        ble_rx.data.idle1[1]   = *(rxData+3);
-        ble_rx.data.idle1[2]   = *(rxData+4);
-        ble_rx.data.roll       = *(rxData+5);
-        ble_rx.data.height     = *(rxData+6);
-        ble_rx.data.linear_H   = *(rxData+7);
-        ble_rx.data.linear_L   = *(rxData+8);
-        ble_rx.data.angular    = *(rxData+9);
-        ble_rx.data.stable     = *(rxData+10);
-        ble_rx.data.mode       = *(rxData+11);
-        ble_rx.data.dir        = *(rxData+12);
-        ble_rx.data.joy_y      = *(rxData+13);
-        ble_rx.data.joy_x      = *(rxData+14);
-        ble_rx.data.idle2[0]   = *(rxData+15);
-        ble_rx.data.idle2[1]   = *(rxData+16);
-        ble_rx.data.idle2[2]   = *(rxData+17);
-        ble_rx.data.idle2[3]   = *(rxData+18);
-        ble_rx.data.checkSum   = *(rxData+19);
-      }
+      uint8_t* rxData = pCharacteristic->getData();
 
+      if (pCharacteristic->getLength() == 20)
+      {
+        int i;
+        for(i=0;i<20;i++)
+        {
+          ble_rx.frame[i]  = *(rxData+i);            //Transfer data
+        }
+        if(ble_rx.remaining_pack == 0)
+        {
+          ble_rx.remaining_pack = ble_rx.frame[3];
+        }
+
+
+        //Status setting and acquisition commands
+        ble_rx.state = BLE_STATE_RECEIVE_OK;        
+        ble_rx.cmd = ble_rx.frame[2];               
+      }
     }
 };
 
@@ -59,14 +62,39 @@ class MyServerCallbacks: public BLEServerCallbacks {
 
     void onDisconnect(BLEServer* pServer) {
       deviceConnected = false;
+      // Restart the broadcast to allow for reconnection
+      pServer->getAdvertising()->start();
     }
 };
 
-
-void ble_init(char* botName) 
+void dev_name_build(char ble_name[])  
 {
+
+  char basc[] = "navbot_en01-";
+  uint8_t mac[7];
+  esp_read_mac(mac, ESP_MAC_BT);
+  mac[6] = 0;
+  char i;
+
+  for(i=0;i<6;i++) //Convert the mac address to contain only 0-9/a-z
+  {
+    mac[i] = mac[i]%36; // 10+26=36
+
+    if(mac[i]<=9)       mac[i] = mac[i] + '0'; //0-9
+    else if(mac[i]<=35)  mac[i] = mac[i] -10 + 'a'; //a-z
+  }
+
+  sprintf(ble_name,"%s%s",basc,mac);
+  Serial.printf(ble_name);
+  Serial.printf("\r\n");
+}
+
+void ble_init() 
+{
+  char ble_name[20]={0};
+  dev_name_build(ble_name);
   // Create the BLE Device
-  BLEDevice::init(botName);
+  BLEDevice::init(ble_name);
   // Create the BLE Server
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
@@ -91,17 +119,187 @@ void ble_init(char* botName)
   // Start advertising
   pServer->getAdvertising()->start();
   Serial.println("Waiting a client connection to notify...");
+
+  ble_rx_data_clear();
 }
+
+
 void ble_send_data(uint8_t* data, uint8_t len)
 {
   pTxCharacteristic->setValue(data, len);  //reply
   pTxCharacteristic->notify();
 }
-
-void bleUartTest(void) 
+void ble_rx_data_clear()
 {
+  int i;
+  for(i=0;i<50;i++)
+  {
+    ble_rx.data[i] = 0;
+  }
+  ble_rx.index = 0;
+}
+void ble_rx_data_add(uint8_t* data, uint8_t len)
+{
+  int i;
+  for(i=0;i<len;i++)
+  {
+    ble_rx.data[ble_rx.index] = *(data+i);
+    ble_rx.index++;
+    if(ble_rx.index>(BLE_DATA_SIZE-1))
+    {
+      ble_rx.index = BLE_DATA_SIZE-1;
+    }
+  }
+}
+void ble_loop(void)
+{
+  //The BLE data reception has been completed
+  if(ble_rx.state == BLE_STATE_RECEIVE_OK) 
+  {
+    //BLE reply
+    ble_send_data((uint8_t*)ble_rx.frame, 20);  
+    //Merge data packets
+    if(ble_rx.remaining_pack>0)  
+    {
+      ble_rx_data_add(&ble_rx.frame[5],15);
+      ble_rx.remaining_pack--;
+      //There is still BLE data to be received and status changes
+      ble_rx.state = BLE_STATE_RECEIVE_WAIT; 
+    }
+    else //Process data packets
+    {
+      //Merge the last package of data；if there is only one package of data, that is also the last one
+      ble_rx_data_add(&ble_rx.frame[5],15);  
+
+      switch(ble_rx.cmd)
+      {
+        case CMD_MANEUVER:
+        {
+          ble_cmd_maneuver_processing();
+        }break;
+        case CMD_WIFI:
+        {
+          ble_cmd_wifi_processing();
+        }break;
+      }
+      //The data processing is completed and the status is changed to idle
+      ble_rx.state = BLE_STATE_IDLE; 
+      ble_rx_data_clear();
+    }
+  }
+}
+
+//
+void ble_cmd_maneuver_processing(void)
+{
+  CmdManeuverTypDef* ble_maneuver;
+  ble_maneuver = (CmdManeuverTypDef*)ble_rx.data;
+// The processing logic of webSocket is used, so JSON needs to be generated
+  StaticJsonDocument<300> doc;
+  char jsonBuffer[300];
+  doc["roll"]     = ble_maneuver->roll;
+  doc["height"]   = ble_maneuver->height;
+
+  int16_t linear;
+  linear = (int16_t)((ble_maneuver->linear_H << 8) | ble_maneuver->linear_L);
+  doc["linear"]   = linear;
+  doc["angular"]  = ble_maneuver->angular;
+  doc["stable"]   = ble_maneuver->stable;
+  doc["mode"]     = "basic";
+  switch(ble_maneuver->dir)
+  {
+    case 0:  doc["dir"]      = "stop";     break;
+    case 1:  doc["dir"]      = "jump";     break;
+    case 2:  doc["dir"]      = "forward";  break;
+    case 3:  doc["dir"]      = "back";     break;
+    case 4:  doc["dir"]      = "left";     break;
+    case 5:  doc["dir"]      = "right";    break;
+  }
+  doc["joy_y"]    = ble_maneuver->joy_y;
+  doc["joy_x"]    = ble_maneuver->joy_x;
+
+  serializeJson(doc, jsonBuffer);
+  Serial.println(jsonBuffer);
+
+  String mode_str = doc["mode"];
+  if(mode_str == "basic")
+  {
+    rp.parseBasic(doc);
+  }
+  ble_rx.state = BLE_STATE_IDLE;
+}
+void ble_cmd_wifi_processing(void)
+{
+  uint8_t ssid[50]={0};
+  uint8_t password[30]={0};
+  uint8_t TAB = 0;
+  uint8_t i,j=0;
+
+  for(i=0;i<BLE_DATA_SIZE;i++)
+  {
+    //Determine whether the wifi name has ended
+    if(ble_rx.data[i]=='\t')
+    {
+      TAB=1;
+      ssid[i]=0;//Fill the end with 0
+      i++;
+    }
+    if(TAB == 0)
+    {
+      //Judge the validity of characters
+      if(ble_rx.data[i]>=' ' && ble_rx.data[i]<='~') 
+      {
+        ssid[i]=ble_rx.data[i];
+      }
+      else
+      {
+        Serial.printf("cmd_wifi Err, data[%d]",i);
+        return;
+      }
+    }
+    else if(TAB == 1)
+    {
+      //Judge the validity of characters
+      if(ble_rx.data[i]>=' ' && ble_rx.data[i]<='~')
+      {
+        password[j++]=ble_rx.data[i];
+      }
+      else if(ble_rx.data[i] == 0)
+      {
+        password[j++]=0;//Fill the end with 0
+        break;
+      }
+      else
+      {
+        Serial.printf("cmd_wifi Err, data[%d] = 0x%x",i,ble_rx.data[i]);
+        return;
+      }
+    }
+  }
+
+  //Save the wifi information
+  EEPROM.writeString(ADDR_WIFI_SSID,(const char*)ssid);  
+  EEPROM.writeString(ADDR_WIFI_PASSWORD,(const char*)password);  
+  EEPROM.commit();
+
+  //
+  uint8_t r_ssid[50]={0};
+  uint8_t r_password[30]={0};
+  EEPROM.readString(ADDR_WIFI_SSID,(char*)r_ssid,50);  
+  EEPROM.readString(ADDR_WIFI_PASSWORD,(char*)r_password,30);  
+
+  Serial.printf("wifi:%s \r\n",r_ssid);
+  Serial.printf("pswd:%s \r\n",r_password);
+  //Disconnect the current wifi and then you can connect to a new one
+  WiFi.disconnect();
+}
+
+
+void ble_test(void)
+{
+  return;
   while(1)
   {
-
+    ble_loop();
   }
 }

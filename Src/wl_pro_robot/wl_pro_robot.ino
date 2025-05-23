@@ -15,8 +15,9 @@
 #include "wifi.h"
 #include "esp_adc_cal.h"
 #include "ble.h"
+#include "EEPROM.h"
+#include "define.h"
 
-#define  botName "navbot_en01-"
 
 /************Instance definition*************/
 
@@ -63,13 +64,12 @@ void StabZeropoint(char* cmd) { command.pid(&pid_zeropoint, cmd); }
 void lpfZeropoint(char* cmd)  { command.lpf(&lpf_zeropoint, cmd); }
 void StabRollAngle(char* cmd) { command.pid(&pid_roll_angle, cmd);}
 void lpfRoll(char* cmd)       { command.lpf(&lpf_roll, cmd);      }
-
+bool one_second_tick(void);
 //void Stabtest_zeropoint(char* cmd) { command.pid(&test_zeropoint, cmd); }
 
 //WebServer instance
 WebServer webserver; // server
 WebSocketsServer websocket = WebSocketsServer(81); // Define a webSocket server to process messages sent by clients
-RobotProtocol rp(20);
 int joystick_value[2];
 
 //STS steering engine instance
@@ -131,11 +131,13 @@ static const adc_unit_t unit = ADC_UNIT_1;
 #define LED_BAT 13
 
 void setup() {
+
+  delay(3000);
   Serial.begin(115200);
   Serial2.begin(1000000);
-  ble_init(botName);
-  WiFi_SetAP(botName);
-  // set_sta_wifi();      // ESP-01S STA mode
+  
+  ble_init();
+  wifi_init();
   webserver.begin();
   webserver.on("/", HTTP_GET, basicWebCallback);
   websocket.begin();
@@ -238,9 +240,15 @@ void setup() {
 }
 
 void loop() {
-  bat_check();        //Voltage detection
+
+  if(one_second_tick())
+  {
+    bat_check();        //Voltage detection
+    wifi_loop();
+  }
+  
   web_loop();         //Web data update
-  ble_data_processing();
+  ble_loop();
   mpu6050.update();   //IMU data update
   lqr_balance_loop(); //lqr self-balancing control
   yaw_loop();         //yaw axis steering control
@@ -547,7 +555,7 @@ void adc_calibration_init()
 //Voltage detection
 void bat_check()
 {
-  if(bat_check_num > 1000)
+  if(bat_check_num > 10)
   {
     //Voltage reading
     uint32_t sum = 0;
@@ -567,47 +575,29 @@ void bat_check()
   else
     bat_check_num++;
 }
-void ble_data_processing(void)
+
+//Generate a one-second tick
+bool one_second_tick(void)
 {
-  if(ble_rx.state == 1)
+  static unsigned long lastMillis =0;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastMillis >= 1000) 
   {
-    if((ble_rx.data.header[0] == 0x55) && (ble_rx.data.header[1] == 0xAA) )
-    {
-      StaticJsonDocument<300> doc;
-      char jsonBuffer[300];
-      doc["roll"]     = ble_rx.data.roll;
-      doc["height"]   = ble_rx.data.height;
-
-      int16_t linear;
-      linear = (int16_t)((ble_rx.data.linear_H << 8) | ble_rx.data.linear_L);
-      doc["linear"]   = linear;
-      doc["angular"]  = ble_rx.data.angular;
-      doc["stable"]   = ble_rx.data.stable;
-      doc["mode"]     = "basic";//ble_rx.data.mode;
-      switch(ble_rx.data.dir)
-      {
-        case 0:  doc["dir"]      = "stop";     break;
-        case 1:  doc["dir"]      = "jump";     break;
-        case 2:  doc["dir"]      = "forward";  break;
-        case 3:  doc["dir"]      = "back";     break;
-        case 4:  doc["dir"]      = "left";     break;
-        case 5:  doc["dir"]      = "right";    break;
-      }
-      doc["joy_y"]    = ble_rx.data.joy_y;
-      doc["joy_x"]    = ble_rx.data.joy_x;
-
-      serializeJson(doc, jsonBuffer);
-      Serial.println(jsonBuffer);
-
-      String mode_str = doc["mode"];
-      if(mode_str == "basic")
-      {
-        rp.parseBasic(doc);
-      }
-      ble_send_data((uint8_t*)(&ble_rx.data), 20);
-      ble_rx.state = 0;
-
-    }
-    
+    lastMillis = currentMillis; 
+    return 1;
   }
+  //Overflow handling
+  if(lastMillis > currentMillis)
+  {
+    lastMillis = currentMillis; 
+  }
+
+  return 0;
 }
+
+
+
+
+
+

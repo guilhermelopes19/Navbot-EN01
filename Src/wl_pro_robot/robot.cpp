@@ -1,7 +1,8 @@
 
 #include "robot.h"
-char SN[7] = "fcn5fg";
 Wrobot wrobot;
+RobotProtocol rp(20);
+
 RobotProtocol::RobotProtocol(uint8_t len)
 {
     _len = len;
