@@ -67,7 +67,7 @@ class MyServerCallbacks: public BLEServerCallbacks {
     }
 };
 
-void dev_name_build(char ble_name[])  
+static void dev_name_build(char ble_name[])  
 {
 
   char basc[] = "navbot_en01-";
@@ -129,6 +129,7 @@ void ble_send_data(uint8_t* data, uint8_t len)
   pTxCharacteristic->setValue(data, len);  //reply
   pTxCharacteristic->notify();
 }
+
 void ble_rx_data_clear()
 {
   int i;
@@ -138,6 +139,7 @@ void ble_rx_data_clear()
   }
   ble_rx.index = 0;
 }
+
 void ble_rx_data_add(uint8_t* data, uint8_t len)
 {
   int i;
@@ -291,7 +293,8 @@ void ble_cmd_wifi_processing(void)
   Serial.printf("wifi:%s \r\n",r_ssid);
   Serial.printf("pswd:%s \r\n",r_password);
   //Disconnect the current wifi and then you can connect to a new one
-  WiFi.disconnect();
+  extern char wifi_mode;
+  if(wifi_mode == WIFI_STA) WiFi.disconnect();
 }
 
 

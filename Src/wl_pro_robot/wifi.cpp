@@ -6,9 +6,23 @@
 char wifi_ssid[50]={0};
 char wifi_password[30]={0};
 char eeprom_once=0;
+
+
+
+// Configure the parameters related to the AP (hotspot) mode
+const char *ap_password = "12345678";   
+
+IPAddress AP_IP(192, 168, 1, 11); 
+IPAddress AP_GATEWAY(192, 168, 1, 11); 
+IPAddress AP_SUBNET(255, 255, 255, 0); 
+
+
+char wifi_mode;
+
 // ESP-01S access the WiFi network in AP mode
-void set_sta_wifi()
+void wifi_set_sta()
 {
+
   if(eeprom_once == 0)
   {
     eeprom_once = 1;
@@ -27,27 +41,67 @@ void set_sta_wifi()
   Serial.printf("pswd:%s \r\n",wifi_password);
 
   WiFi.setHostname("navbot-en01-123456");
+  wifi_mode = WIFI_STA;
   WiFi.mode(WIFI_STA);
   WiFi.begin(wifi_ssid,wifi_password);
   Serial.printf("connect %s...\r\n",wifi_ssid);
 
 }
+
+static void dev_name_build(char dev_name[])
+{
+
+  char basc[] = "navbot_en01-";
+  uint8_t mac[7];
+  esp_read_mac(mac, ESP_MAC_BT);
+  mac[6] = 0;
+  char i;
+
+  for(i=0;i<6;i++) //Convert the mac address to contain only 0-9/a-z
+  {
+    mac[i] = mac[i]%36; // 10+26=36
+
+    if(mac[i]<=9)       mac[i] = mac[i] + '0'; //0-9
+    else if(mac[i]<=35)  mac[i] = mac[i] -10 + 'a'; //a-z
+  }
+
+  sprintf(dev_name,"%s%s",basc,mac);
+  Serial.printf(dev_name);
+  Serial.printf("\r\n");
+}
+
+void wifi_set_ap(void)
+{
+  char ap_name[20]={0};
+  dev_name_build(ap_name);
+  wifi_mode = WIFI_AP;
+	WiFi.mode(WIFI_AP); 
+	WiFi.softAPConfig(AP_IP, AP_GATEWAY, AP_SUBNET); 
+	WiFi.softAP(ap_name, ap_password); 
+	// Serial.println();
+	// Serial.print("AP IP address = ");
+	// Serial.println(WiFi.softAPIP());
+}
+
 void wifi_init(void)
 {
-  set_sta_wifi();
+  // wifi_set_sta();
+  wifi_set_ap();
 }
 void wifi_loop(void)
 {
   static char wifi_status = 0;
   static char connect_count_down = 10;
 
+  if(wifi_mode != WIFI_STA) return;
+
 //If the wifi is not connected, it will actively connect every 10 seconds
-  if(WiFi.status()!=WL_CONNECTED)  
+  if(WiFi.status()!=WL_CONNECTED)
   {
     connect_count_down --;
     if(connect_count_down == 0)
     {
-      set_sta_wifi();
+      wifi_set_sta();
       connect_count_down = 10;
     }
     wifi_status = 0;

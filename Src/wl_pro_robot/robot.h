@@ -43,12 +43,13 @@ class RobotProtocol
 		~RobotProtocol();
 		void spinOnce(void);
 		void parseBasic(StaticJsonDocument<300> &doc);
-    private:
-        uint8_t *_now_buf;
-		uint8_t *_old_buf;
-		uint8_t _len;
-		void UART_WriteBuf(void);
-		int checkBufRefresh(void);
+;
+  private:
+    uint8_t *_now_buf;
+    uint8_t *_old_buf;
+    uint8_t _len;
+    void UART_WriteBuf(void);
+    int checkBufRefresh(void);
 };
 
 extern Wrobot wrobot;
