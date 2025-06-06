@@ -3,7 +3,7 @@ package com.hyun.robot.utils
 
 class BleCommand {
     companion object {
-        const val BASE_HEIGHT = 0X32.toByte()
+        const val BASE_HEIGHT = 0X20.toByte()
         private const val HEADER_1 = 0x55.toByte()
         private const val HEADER_2 = 0xAA.toByte()
         const val EMPTY_BYTE = 0x00.toByte()

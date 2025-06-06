@@ -62,14 +62,14 @@
             android:label="@string/title_activity_device_detail"
             android:launchMode="singleTop"
             android:taskAffinity=""
-            android:excludeFromRecents="true"
+            android:excludeFromRecents="false"
             android:theme="@style/Theme.Robot" />
         <activity
             android:name=".ui.AddDeviceActivity"
             android:exported="false"
             android:launchMode="singleTop"
             android:taskAffinity=""
-            android:excludeFromRecents="true"
+            android:excludeFromRecents="false"
             android:configChanges="orientation|screenSize"
             android:screenOrientation="landscape"
             android:label="@string/title_activity_add_device"
@@ -81,7 +81,7 @@
             android:label="@string/app_name"
             android:launchMode="singleTop"
             android:taskAffinity=""
-            android:excludeFromRecents="true"
+            android:excludeFromRecents="false"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.Robot">
             <intent-filter>

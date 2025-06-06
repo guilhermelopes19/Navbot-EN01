@@ -7,6 +7,8 @@ import android.bluetooth.BluetoothDevice
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -260,7 +262,7 @@ fun ShowDetailScreen(content: DeviceDetailActivity) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            VerticalSliderView("Base Height", "mm", 0.0f, 53, 32)
+                            VerticalSliderView("Base Height", "mm", 0.0f, 53, 32,true)
                         }
                     }
                     Box(
@@ -275,7 +277,7 @@ fun ShowDetailScreen(content: DeviceDetailActivity) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            VerticalSliderView("roll", "°", 0.5f, 60, -30)
+                            VerticalSliderView("roll", "°", 0.5f, 60, -30,false)
                         }
                     }
                     Box(
@@ -290,7 +292,7 @@ fun ShowDetailScreen(content: DeviceDetailActivity) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            VerticalSliderView("Linear Vel", "mm/s", 0.5f, 400, -200)
+                            VerticalSliderView("Linear Vel", "mm/s", 0.5f, 400, -200,false)
                         }
                     }
                     Box(
@@ -305,7 +307,7 @@ fun ShowDetailScreen(content: DeviceDetailActivity) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            VerticalSliderView("Angular Vel", "°/s", 0.5f, 200, -100)
+                            VerticalSliderView("Angular Vel", "°/s", 0.5f, 200, -100,false)
                         }
                     }
                     Box(
@@ -319,7 +321,12 @@ fun ShowDetailScreen(content: DeviceDetailActivity) {
                             onClick = {
                                 bDevice = MyApplication.bleManager.connectingDevice
                                 if (isToggleOn && bDevice != null) {
-                                    sendBleSettingData()
+                                    Handler(Looper.getMainLooper()).postDelayed(
+                                        {
+                                            sendBleJumpData()
+                                        },
+                                        100
+                                    )
                                 } else {
                                     if (!isToggleOn) {
                                         toConnectDevice()
@@ -390,6 +397,21 @@ fun sendBleSettingData() {
             linearW = linearVel,
             angular = angularVel,
             stable = onOrOff,
+        )
+    )
+}
+
+fun sendBleJumpData() {
+    MyApplication.bleManager.sendDataToDevice(
+        device = bDevice!!,
+        dataToSend = BleCommand.getBleCommand(
+            height = baseHeight,
+            roll = roll,
+            linearH = linearVel,
+            linearW = linearVel,
+            angular = angularVel,
+            stable = onOrOff,
+            dir = 0x01
         )
     )
 
@@ -522,7 +544,8 @@ fun PermissionHandler(
 fun VerticalSlider(
     maxHeight: Dp = 200.dp,
     initialProgress: Float = 0.5f,
-    onProgressChanged: (Float) -> Unit
+    onProgressChanged: (Float) -> Unit,
+    canDrag:Boolean
 ) {
     val cornerRadius = 30.dp
     val maxHeightPx = with(LocalDensity.current) { maxHeight.toPx() }
@@ -542,10 +565,12 @@ fun VerticalSlider(
             .size(width = 30.dp, height = maxHeight)
             .background(Color(0xFFE1E9F0), RoundedCornerShape(cornerRadius))
             .pointerInput(Unit) {
-                detectVerticalDragGestures { _, dragAmount ->
-                    val newHeight = (progressHeight - dragAmount).coerceIn(0f, maxHeightPx)
-                    progressHeight = newHeight
-                    onProgressChanged(newHeight / maxHeightPx)
+                if(canDrag) {
+                    detectVerticalDragGestures { _, dragAmount ->
+                        val newHeight = (progressHeight - dragAmount).coerceIn(0f, maxHeightPx)
+                        progressHeight = newHeight
+                        onProgressChanged(newHeight / maxHeightPx)
+                    }
                 }
             }
     ) {
@@ -567,6 +592,7 @@ fun VerticalSliderView(
     baseVolume: Float,
     verticalPlusValue: Int,
     verticalAddValue: Int,
+    canDrag:Boolean
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -577,20 +603,23 @@ fun VerticalSliderView(
         VerticalSlider(
             initialProgress = volume,
             onProgressChanged = {
-                volume = it
-                baseHeight =
-                    BleCommand.intToUnsignedByte((volume * verticalPlusValue + verticalAddValue).toInt())
-                if (isToggleOn) {
-                    if (showLoading) {
-                        toConnectDevice()
+                if(canDrag) {
+                    volume = it
+                    baseHeight =
+                        BleCommand.intToUnsignedByte((volume * verticalPlusValue + verticalAddValue).toInt())
+                    if (isToggleOn) {
+                        if (showLoading) {
+                            toConnectDevice()
+                        } else {
+                            bDevice = MyApplication.bleManager.connectingDevice
+                            sendBleSettingData()
+                        }
                     } else {
-                        bDevice = MyApplication.bleManager.connectingDevice
-                        sendBleSettingData()
+                        toConnectDevice()
                     }
-                } else {
-                    toConnectDevice()
                 }
-            }
+            },
+            canDrag = canDrag
         )
 
         Text(
@@ -697,12 +726,18 @@ fun Joystick(
                         positionChange(Offset(normalizedX, normalizedY))
                     },
                     onDragEnd = {
+
                         buttonOffset = Offset(0f, 0f)
                         joyX = 0X00
                         joyY = 0X00
                         isJoystickActive = false
                         if (!showLoading && bDevice != null) {
-                            sendBleJoyXYData()
+                            Handler(Looper.getMainLooper()).postDelayed(
+                                {
+                                    sendBleJoyXYData()
+                                },
+                                100
+                            )
                         } else {
                             toConnectDevice()
                         }

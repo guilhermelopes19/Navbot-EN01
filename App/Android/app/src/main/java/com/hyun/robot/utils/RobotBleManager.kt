@@ -9,7 +9,6 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -25,7 +24,6 @@ import com.ficat.easyble.gatt.callback.BleWriteCallback
 import com.ficat.easyble.scan.BleScanCallback
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
-import com.hyun.robot.MyApplication.Companion.wifiAutoConnector
 import com.hyun.robot.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -296,10 +294,6 @@ class RobotBleManager(context: Context) {
     fun connectToDevice(device: BluetoothDevice, callback: BleConnectCallback) {
         try {
             connectDev = null
-//            if (bleManager.isConnected(device.address)) {
-//                bleManager.disconnect(device.address)
-//            }
-
             bleManager.connect(device.address, object : BleConnectCallback {
                 override fun onFailure(failureCode: Int, info: String?, device: BleDevice?) {
                     when (failureCode) {
@@ -373,7 +367,6 @@ class RobotBleManager(context: Context) {
                 }
 
                 override fun onDisconnected(info: String?, status: Int, device: BleDevice?) {
-//                    connectedDevices.remove(device)
                     callback.onDisconnected(info, status, device)
                 }
             }, BleHandlerThread("connectToDevice"))
@@ -473,7 +466,6 @@ class RobotBleManager(context: Context) {
 
                 override fun onDisconnected(info: String?, status: Int, device: BleDevice?) {
                     callback.onDisconnected(info, status, device)
-//                    connectedDevices.remove(device)
                     isConnecting = false
                 }
             }, BleHandlerThread("connectToDevice"))
@@ -482,106 +474,6 @@ class RobotBleManager(context: Context) {
             isConnecting = false
         }
     }
-    fun addressConnectToDevice(mac: String, callback: BleConnectCallback) {
-        try {
-            if (isConnecting) {
-                return
-            }
-            isConnecting = true
-            connectDev = null
-            if (bleManager.isConnected(mac)) {
-                bleManager.disconnect(mac)
-            }
-
-            bleManager.connect(mac, object : BleConnectCallback {
-                override fun onFailure(failureCode: Int, info: String?, device: BleDevice?) {
-                    info?.let { showToast(it) }
-                    when (failureCode) {
-                        BleCallback.FAILURE_CONNECTION_NOT_ESTABLISHED -> {}
-                        BleCallback.FAILURE_SERVICE_NOT_FOUND -> {}
-                        BleCallback.FAILURE_CHARACTERISTIC_NOT_FOUND_IN_SERVICE -> {}
-                        BleCallback.FAILURE_WRITE_UNSUPPORTED -> {}
-                        BleCallback.FAILURE_OTHER -> {}
-                    }
-                    callback.onFailure(failureCode, info, device)
-                    isConnecting = false
-                }
-
-                override fun onStart(startSuccess: Boolean, info: String?, device: BleDevice?) {
-                    callback.onStart(startSuccess, info, device)
-                    isConnecting = false
-                }
-
-                override fun onConnected(device: BleDevice?) {
-                    device?.let {
-                        connectDev = device
-                        connectedDevices.remove(device)
-                        connectedDevices.add(device)
-                        Handler(Looper.getMainLooper()).postDelayed({
-                            val gatt = bleManager.getBluetoothGatt(device.address)
-                            gatt?.let {
-                                val targetService = it.services?.find { service ->
-                                    service.uuid.toString()
-                                        .equals(uuid_service, ignoreCase = true)
-                                }
-
-                                targetService?.let { service ->
-                                    uuid_service = service.uuid.toString()
-
-                                    val writeCharacteristic =
-                                        service.characteristics.find { characteristic ->
-                                            (characteristic.properties and
-                                                    (BluetoothGattCharacteristic.PROPERTY_WRITE or
-                                                            BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)) != 0
-                                        }
-
-                                    writeCharacteristic?.let {
-                                        uuid_notify_write = it.uuid.toString()
-                                        setupWriteCharacteristic(it)
-                                    } ?: run {
-                                        Log.e(TAG, "not found ")
-                                        showToast("device can not write")
-                                        disconnect()
-                                        return@postDelayed
-                                    }
-
-                                    val notifyCharacteristic =
-                                        service.characteristics.find { characteristic ->
-                                            (characteristic.properties and
-                                                    (BluetoothGattCharacteristic.PROPERTY_NOTIFY or
-                                                            BluetoothGattCharacteristic.PROPERTY_INDICATE)) != 0
-                                        }
-                                    notifyCharacteristic?.let {
-                                        uuid_notify = it.uuid.toString()
-                                        setNotify(device)
-                                    }
-                                } ?: run {
-                                    Log.e(TAG, "not found")
-                                    showToast("service error")
-                                    disconnect()
-                                    return@postDelayed
-                                }
-
-                                gatt.requestMtu(517)
-                                callback.onConnected(device)
-                            }
-                        }, 500)
-                        isConnecting = false
-                    }
-                }
-
-                override fun onDisconnected(info: String?, status: Int, device: BleDevice?) {
-                    callback.onDisconnected(info, status, device)
-//                    connectedDevices.remove(device)
-                    isConnecting = false
-                }
-            }, BleHandlerThread("connectToDevice"))
-        } catch (e: Exception) {
-            showToast(e.message.toString())
-            isConnecting = false
-        }
-    }
-
 
     // Other BLE operations (connect, disconnect, send data) will be added in subsequent parts
     // Additional methods for BLE connection and disconnection
@@ -681,7 +573,6 @@ class RobotBleManager(context: Context) {
                 }
 
                 override fun onDisconnected(info: String?, status: Int, device: BleDevice?) {
-//                    connectedDevices.remove(device)
                     Log.d(TAG, "Disconnect")
                     showToast("Disconnect")
                 }
@@ -788,7 +679,6 @@ class RobotBleManager(context: Context) {
                 }
 
                 override fun onDisconnected(info: String?, status: Int, device: BleDevice?) {
-//                    connectedDevices.remove(device)
                     Log.d(TAG, "Disconnect")
                     showToast("Disconnect")
                     callback.onDisconnected(info,status,device)
@@ -850,7 +740,6 @@ class RobotBleManager(context: Context) {
                 override fun onCharacteristicChanged(data: ByteArray?, device: BleDevice?) {
                     data?.let {
                         Log.d(TAG, "Response : ${data.HextoString()}")
-//                        showToast("Response : ${data.HextoString()}")
                         receivingBuffer.addAll(it.toList())
                         var index = 0
                         while (index < receivingBuffer.size - 1) {
@@ -912,25 +801,9 @@ class RobotBleManager(context: Context) {
 //        showToast(data.HextoString())
     }
 
-    fun byteArrayToHexString(bytes: ByteArray): String {
-        val hexChars = "0123456789ABCDEF".toCharArray()
-        val result = StringBuilder(bytes.size * 2)
-        bytes.forEach { byte ->
-            val v = byte.toInt() and 0xFF
-            result.append(hexChars[v shr 4])
-            result.append(hexChars[v and 0x0F])
-        }
-        return result.toString()
-    }
 
     private fun sendCommand(command: ByteArray, mCurrentDevice: BleDevice) {
         isOnline = true
-//        sendCommandArray = command
-//        sendCommandArray[13] = BleCommand.EMPTY_BYTE
-//        sendCommandArray[14] = BleCommand.EMPTY_BYTE
-        val dataString = command.HextoString()
-
-        val hexStr = byteArrayToHexString(command)
         if (mCurrentDevice == null) {
             Log.e(TAG, "No connected device")
             return
@@ -962,7 +835,6 @@ class RobotBleManager(context: Context) {
                 if (justWrite != null) {
                     val dataString = justWrite.HextoString()
                     sendDataCallback.onWriteSuccess(justWrite, device)
-//                    showToast("Command send successfully: $dataString")
                     Log.d(TAG, "Command send successfully: $dataString")
                 }
             }
@@ -1001,39 +873,20 @@ class RobotBleManager(context: Context) {
         }
     }
 
-    fun getDeviceByAddress(mac: String): BluetoothDevice? {
-        try {
-            val bluetoothDevice = bleManager.getBluetoothGatt(mac)
-            if (bluetoothDevice != null) {
-                return bluetoothDevice.device
-            }
-            return null
-        } catch (e: Exception) {
-            showToast(e.message.toString())
-            return null
-        }
-    }
-
     private var sendDataCallback = object : BleWriteCallback {
         override fun onFailure(failureCode: Int, info: String?, device: BleDevice?) {
         }
 
         override fun onWriteSuccess(data: ByteArray?, device: BleDevice?) {
-            CoroutineScope(Dispatchers.IO).launch {
-                val safeData = data ?: return@launch
-                val safeDevice = device ?: return@launch
+            val byteValue = data?.getOrNull(12)
+            val staleString = String.format("%02X", byteValue)
 
-                val byteValue = safeData.getOrNull(12) ?: return@launch
-                val staleString = String.format("%02X", byteValue)
-
-                withContext(Dispatchers.Main) {
-                    if (staleString == "01") {
-                        safeData[12] = BleCommand.EMPTY_BYTE
-                        sendDataToDevice(safeDevice.bluetoothDevice, safeData)
-                    }
+            if (staleString == "01") {
+                data!!?.set(12, BleCommand.EMPTY_BYTE)
+                if (device != null) {
+                    sendDataToDevice(device.bluetoothDevice, data)
                 }
             }
-
         }
     }
 
@@ -1079,13 +932,11 @@ class RobotBleManager(context: Context) {
                     if (bleDevice != null) {
                         connectingDevice = bleDevice.bluetoothDevice
                         connectDev = bleDevice
-//                        connectedDevices.remove(bleDevice)
                     }
                     sendCommand(dataToSend, connectDev!!)
                 }
 
                 override fun onDisconnected(info: String?, status: Int, device: BleDevice?) {
-//                    connectedDevices.remove(device)
                 }
             })
 
