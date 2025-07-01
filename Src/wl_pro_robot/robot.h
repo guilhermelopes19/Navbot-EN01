@@ -27,7 +27,14 @@ typedef enum {
 	LEFT,        	
 	STOP,
   JUMP,         		
-} QR_State_t; 
+} QR_State_t;
+
+
+struct {
+    String SYS_WIFI = "sys_wifi";
+    String SYS_WEB_SOCKET_SERVER = "sys_web_socket_server";
+    String SYS_RESTART = "sys_restart";
+} MESSAGE_TYPE;
 
 
 	
@@ -42,6 +49,8 @@ class RobotProtocol
 		RobotProtocol(uint8_t len);
 		~RobotProtocol();
 		void spinOnce(void);
+		void printDoc(StaticJsonDocument<300> &doc);
+		void isSys(StaticJsonDocument<300> &doc);
 		void parseBasic(StaticJsonDocument<300> &doc);
 ;
   private:

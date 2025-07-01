@@ -6,7 +6,7 @@
 #include "ble.h"
 #include "EEPROM.h"
 #include "robot.h"
-#include "define.h"
+#include "eeprom_util.h"
 
 BLEServer *pServer = NULL;
 BLECharacteristic * pTxCharacteristic;
@@ -280,19 +280,14 @@ void ble_cmd_wifi_processing(void)
   }
 
   //Save the wifi information
-  EEPROM.writeString(ADDR_WIFI_SSID,(const char*)ssid);  
-  EEPROM.writeString(ADDR_WIFI_PASSWORD,(const char*)password);  
-  EEPROM.commit();
+    eeprom_util.write(&EepromParam.ADDR_WIFI_SSID, (const char*)ssid);
+    eeprom_util.write(&EepromParam.ADDR_WIFI_PASSWORD, (const char*)password);
 
-  //
-  uint8_t r_ssid[50]={0};
-  uint8_t r_password[30]={0};
-  EEPROM.readString(ADDR_WIFI_SSID,(char*)r_ssid,50);  
-  EEPROM.readString(ADDR_WIFI_PASSWORD,(char*)r_password,30);  
 
-  Serial.printf("wifi:%s \r\n",r_ssid);
-  Serial.printf("pswd:%s \r\n",r_password);
-  //Disconnect the current wifi and then you can connect to a new one
+    Serial.print("READ SAVE WIFI SSID:");
+    Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_SSID));
+    Serial.print("READ SAVE WIFI PASSWORD:");
+    Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_PASSWORD));
   extern char wifi_mode;
   if(wifi_mode == WIFI_STA) WiFi.disconnect();
 }

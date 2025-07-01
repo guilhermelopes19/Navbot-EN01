@@ -1,7 +1,6 @@
 #include "wifi.h"
 #include "robot.h"
-#include "EEPROM.h"
-#include "define.h"
+#include "eeprom_util.h"
 
 char wifi_ssid[50]={0};
 char wifi_password[30]={0};
@@ -22,28 +21,17 @@ char wifi_mode;
 // ESP-01S access the WiFi network in AP mode
 void wifi_set_sta()
 {
-
-  if(eeprom_once == 0)
-  {
-    eeprom_once = 1;
-    if(!EEPROM.begin(100))
-    {
-      Serial.printf("error! eeprom init false \r\n");
-      return;
-    }
-  }
-  
   //Read the wifi information
-  EEPROM.readString(ADDR_WIFI_SSID,wifi_ssid,50);  
-  EEPROM.readString(ADDR_WIFI_PASSWORD,wifi_password,30);  
-
-  Serial.printf("wifi:%s \r\n",wifi_ssid);
-  Serial.printf("pswd:%s \r\n",wifi_password);
+  eeprom_util.read(& EepromParam.ADDR_WIFI_SSID,wifi_ssid);
+  eeprom_util.read(& EepromParam.ADDR_WIFI_PASSWORD,wifi_password);
 
   WiFi.setHostname("navbot-en01-123456");
   wifi_mode = WIFI_STA;
   WiFi.mode(WIFI_STA);
   WiFi.begin(wifi_ssid,wifi_password);
+
+  String wifi_info = String("ssid:") + wifi_ssid + ",password:" + wifi_password;
+  Serial.println("Connecting to Wifi: " + wifi_info);
   Serial.printf("connect %s...\r\n",wifi_ssid);
 
 }
@@ -83,10 +71,24 @@ void wifi_set_ap(void)
 	// Serial.println(WiFi.softAPIP());
 }
 
+String get_wifi_state(void) {
+    return eeprom_util.read(& EepromParam.ADDR_WIFI_STATE);
+}
+
 void wifi_init(void)
 {
-  // wifi_set_sta();
-  wifi_set_ap();
+    String wifi_state = get_wifi_state();
+    Serial.printf("wifi_state: %s\n", wifi_state.c_str());
+    if (wifi_state == WIFI_STATE.CLIENT)
+    {
+        Serial.println("start wifi client...");
+        wifi_set_sta(); // wifi client
+    }
+    else if(wifi_state == WIFI_STATE.SERVER)
+    {
+        Serial.println("start wifi server...");
+        wifi_set_ap(); // wifi server
+    }
 }
 void wifi_loop(void)
 {

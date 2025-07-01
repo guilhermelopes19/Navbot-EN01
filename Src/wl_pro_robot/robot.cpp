@@ -1,5 +1,8 @@
 
 #include "robot.h"
+#include <ArduinoJson.h>
+#include "wifi.h"
+#include "eeprom_util.h"
 Wrobot wrobot;
 RobotProtocol rp(20);
 
@@ -77,9 +80,65 @@ int RobotProtocol::checkBufRefresh(void)
     return ret;
 }
 
+
+void RobotProtocol::printDoc(StaticJsonDocument<300> &doc){
+    char receive_command[300];
+    serializeJson(doc, receive_command);
+    Serial.printf("receive_command:%s \r\n",receive_command);
+}
+
+void RobotProtocol::isSys(StaticJsonDocument<300> &doc) {
+    String type = doc["type"];
+    Serial.print("type:");
+    Serial.println(type);
+
+    if (type == MESSAGE_TYPE.SYS_WIFI) {
+        String ssid = doc["ssid"];
+        String password = doc["password"];
+        String state = doc["state"];
+
+        // save data
+        if (state == WIFI_STATE.SERVER || state == WIFI_STATE.CLIENT || state == WIFI_STATE.CLOSE) {
+            eeprom_util.write(&EepromParam.ADDR_WIFI_STATE, state);
+        }
+        eeprom_util.write(&EepromParam.ADDR_WIFI_SSID, ssid);
+        eeprom_util.write(&EepromParam.ADDR_WIFI_PASSWORD, password);
+
+        // read data
+        Serial.print("READ SAVE WIFI STATE:");
+        Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_STATE));
+        Serial.print("READ SAVE WIFI SSID:");
+        Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_SSID));
+        Serial.print("READ SAVE WIFI PASSWORD:");
+        Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_PASSWORD));
+
+    } else if (type == MESSAGE_TYPE.SYS_WEB_SOCKET_SERVER) {
+        String host = doc["host"];
+        uint16_t port = doc["port"];
+        String url = doc["url"];
+
+        // save data
+        eeprom_util.write(&EepromParam.ADDR_WEB_SOCKET_HOST, host);
+        eeprom_util.writeUint16T(&EepromParam.ADDR_WEB_SOCKET_PORT, port);
+        eeprom_util.write(&EepromParam.ADDR_WEB_SOCKET_URL, url);
+
+        // read data
+        Serial.print("READ SAVE WEB SOCKET HOST:");
+        Serial.println(eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_HOST));
+        Serial.print("READ SAVE WEB SOCKET PORT:");
+        Serial.println(eeprom_util.readToUint16T(&EepromParam.ADDR_WEB_SOCKET_PORT));
+        Serial.print("READ SAVE WEB SOCKET URL:");
+        Serial.println(eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_URL));
+    } else if (type == MESSAGE_TYPE.SYS_RESTART) {
+        ESP.restart();
+    }
+}
+
 void RobotProtocol::parseBasic(StaticJsonDocument<300> &doc)
 {
- 
+
+    printDoc(doc);
+    isSys(doc);
     _now_buf[2] = BASIC;
 
     String dir = doc["dir"];
