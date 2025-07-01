@@ -6,6 +6,7 @@
 
 //WiFi transmission header file
 #include <WebSocketsServer.h>
+#include <WebSocketsClient.h>
 #include <ArduinoJson.h>
 #include <WebServer.h>
 #include <WiFi.h>
@@ -16,7 +17,7 @@
 #include "esp_adc_cal.h"
 #include "ble.h"
 #include "EEPROM.h"
-#include "define.h"
+#include "eeprom_util.h"
 
 
 /************Instance definition*************/
@@ -70,6 +71,8 @@ bool one_second_tick(void);
 //WebServer instance
 WebServer webserver; // server
 WebSocketsServer websocket = WebSocketsServer(81); // Define a webSocket server to process messages sent by clients
+
+WebSocketsClient webSocketClient = WebSocketsClient(); // Define a WebSocket client service to handle the messages sent by the server.
 int joystick_value[2];
 
 //STS steering engine instance
@@ -133,15 +136,48 @@ static const adc_unit_t unit = ADC_UNIT_1;
 void setup() {
 
   delay(3000);
-  Serial.begin(115200);
+  Serial.begin(2000000);
   Serial2.begin(1000000);
   
   ble_init();
   wifi_init();
-  webserver.begin();
-  webserver.on("/", HTTP_GET, basicWebCallback);
-  websocket.begin();
-  websocket.onEvent(webSocketEventCallback);
+
+    if(get_wifi_state() != WIFI_STATE.CLOSE)
+    {
+        webserver.begin();
+        webserver.on("/", HTTP_GET, basicWebCallback);
+        websocket.begin();
+        websocket.onEvent(webSocketEventCallback);
+    }
+
+  if(get_wifi_state() == WIFI_STATE.CLIENT)
+  {
+      String web_socket_client_host =  eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_HOST);
+      uint16_t web_socket_client_port = eeprom_util.readToUint16T(&EepromParam.ADDR_WEB_SOCKET_PORT);
+      String web_socket_client_url = eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_URL);
+
+      if(web_socket_client_host.length() > 0 && web_socket_client_port > 0 && web_socket_client_url.length() > 0)
+      {
+          String connectionString = (web_socket_client_port == 443 ? "wss://" : "ws://") + web_socket_client_host + ":" +
+                                    String(web_socket_client_port) + web_socket_client_url;
+
+          Serial.println("Connecting to WebSocket: " + connectionString);
+
+          if(443 == web_socket_client_port){
+              webSocketClient.beginSSL(web_socket_client_host, web_socket_client_port, web_socket_client_url);
+          }else{
+              webSocketClient.begin(web_socket_client_host, web_socket_client_port, web_socket_client_url);
+          }
+
+          webSocketClient.onEvent(webSocketClientEventCallback);// Set event callback handler function
+          webSocketClient.setReconnectInterval(10000);// Optional: Set the reconnection interval (in milliseconds)
+          webSocketClient.enableHeartbeat(15000, 3000, 2); // Ping every 15 seconds, with a 3-second timeout and 2 failed attempts resulting in disconnection.
+      }else{
+          String param = "{web_socket_client_host:" + web_socket_client_host + ",web_socket_client_port:" +
+                         web_socket_client_port + ",web_socket_client_url:" + web_socket_client_url + "}";
+          Serial.println("Connecting to WebSocket: ERROR->Parameter verification failed->" + param);
+      }
+  }
 
   //Steering gear initialization
   //Steering gear effective stroke 450
@@ -477,6 +513,7 @@ void yaw_loop(){
 void web_loop(){
   webserver.handleClient();
   websocket.loop();
+  webSocketClient.loop();// The websocket client continuously makes requests.
   rp.spinOnce();//Update the control information returned by the web end
 }
 
@@ -528,6 +565,33 @@ void webSocketEventCallback(uint8_t num, WStype_t type, uint8_t *payload, size_t
     StaticJsonDocument<300> doc;  
     DeserializationError error = deserializeJson(doc, payload_str);
 
+    String mode_str = doc["mode"];
+    if(mode_str == "basic")
+    {
+      rp.parseBasic(doc);
+    }
+  }
+}
+
+void webSocketClientEventCallback(WStype_t type, uint8_t *payload, size_t length)
+{
+    switch (type) {
+        case WStype_DISCONNECTED:
+            printf("WEB SOCKET CLIENT:DISCONNECTED\n");
+            break;
+
+        case WStype_CONNECTED:
+            printf("WEB SOCKET CLIENT:CONNECTED\n");
+            break;
+    }
+
+  if(type == WStype_TEXT)
+  {
+    String payload_str = String((char*) payload);
+    StaticJsonDocument<300> doc;
+    DeserializationError error = deserializeJson(doc, payload_str);
+
+      printf("eFuse Two Point: Supported\n");
     String mode_str = doc["mode"];
     if(mode_str == "basic")
     {
