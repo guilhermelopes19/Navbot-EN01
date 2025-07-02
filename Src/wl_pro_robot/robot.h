@@ -16,6 +16,7 @@ typedef struct {
   int joyx;
   int joyx_last;
   bool go;
+  int uncontrolable = 0;          //Too much tilt and loss of control
 }Wrobot;
 
 

@@ -20,6 +20,8 @@
 #include "eeprom_util.h"
 
 
+#include "cpu0_task.h"
+
 /************Instance definition*************/
 
 //Electromotor instance
@@ -138,6 +140,7 @@ void setup() {
   delay(3000);
   Serial.begin(2000000);
   Serial2.begin(1000000);
+  xTaskCreatePinnedToCore(cpu0_task, "cpu0_task", 1024 * 4, NULL, 0, NULL, 0);
   
   ble_init();
   wifi_init();
