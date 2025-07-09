@@ -72,7 +72,11 @@ void wifi_set_ap(void)
 }
 
 String get_wifi_state(void) {
-    return eeprom_util.read(& EepromParam.ADDR_WIFI_STATE);
+    String state = eeprom_util.read(& EepromParam.ADDR_WIFI_STATE);
+    if(state.length() == 0){
+        state = WIFI_STATE.SERVER;
+    }
+    return state;
 }
 
 void wifi_init(void)
