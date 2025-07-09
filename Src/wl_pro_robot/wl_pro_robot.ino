@@ -6,7 +6,6 @@
 
 //WiFi transmission header file
 #include <WebSocketsServer.h>
-#include <WebSocketsClient.h>
 #include <ArduinoJson.h>
 #include <WebServer.h>
 #include <WiFi.h>
@@ -18,6 +17,8 @@
 #include "ble.h"
 #include "EEPROM.h"
 #include "eeprom_util.h"
+#include "feedback_util.h"
+#include "web_socket_client_util.h"
 
 
 #include "cpu0_task.h"
@@ -73,8 +74,6 @@ bool one_second_tick(void);
 //WebServer instance
 WebServer webserver; // server
 WebSocketsServer websocket = WebSocketsServer(81); // Define a webSocket server to process messages sent by clients
-
-WebSocketsClient webSocketClient = WebSocketsClient(); // Define a WebSocket client service to handle the messages sent by the server.
 int joystick_value[2];
 
 //STS steering engine instance
@@ -121,12 +120,9 @@ float robot_speed_last = 0;     //Record the wheel speed at the previous time
 int wrobot_move_stop_flag = 0;  //Record the sign that the rocker stops
 int jump_flag = 0;              //Jump period identification
 float leg_position_add = 0;     //roll axis balance control quantity
-int uncontrolable = 0;          //Too much tilt and loss of control
 
 //Voltage detection
 uint16_t bat_check_num = 0;
-int BAT_PIN = 35;    // select the input pin for the ADC
-static esp_adc_cal_characteristics_t adc_chars;
 static const adc1_channel_t channel = ADC1_CHANNEL_7;     
 static const adc_bits_width_t width = ADC_WIDTH_BIT_12;
 static const adc_atten_t atten = ADC_ATTEN_DB_11;
@@ -153,34 +149,7 @@ void setup() {
         websocket.onEvent(webSocketEventCallback);
     }
 
-  if(get_wifi_state() == WIFI_STATE.CLIENT)
-  {
-      String web_socket_client_host =  eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_HOST);
-      uint16_t web_socket_client_port = eeprom_util.readToUint16T(&EepromParam.ADDR_WEB_SOCKET_PORT);
-      String web_socket_client_url = eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_URL);
-
-      if(web_socket_client_host.length() > 0 && web_socket_client_port > 0 && web_socket_client_url.length() > 0)
-      {
-          String connectionString = (web_socket_client_port == 443 ? "wss://" : "ws://") + web_socket_client_host + ":" +
-                                    String(web_socket_client_port) + web_socket_client_url;
-
-          Serial.println("Connecting to WebSocket: " + connectionString);
-
-          if(443 == web_socket_client_port){
-              webSocketClient.beginSSL(web_socket_client_host, web_socket_client_port, web_socket_client_url);
-          }else{
-              webSocketClient.begin(web_socket_client_host, web_socket_client_port, web_socket_client_url);
-          }
-
-          webSocketClient.onEvent(webSocketClientEventCallback);// Set event callback handler function
-          webSocketClient.setReconnectInterval(10000);// Optional: Set the reconnection interval (in milliseconds)
-          webSocketClient.enableHeartbeat(15000, 3000, 2); // Ping every 15 seconds, with a 3-second timeout and 2 failed attempts resulting in disconnection.
-      }else{
-          String param = "{web_socket_client_host:" + web_socket_client_host + ",web_socket_client_port:" +
-                         web_socket_client_port + ",web_socket_client_url:" + web_socket_client_url + "}";
-          Serial.println("Connecting to WebSocket: ERROR->Parameter verification failed->" + param);
-      }
-  }
+    web_sockets_client_init();
 
   //Steering gear initialization
   //Steering gear effective stroke 450
@@ -516,7 +485,7 @@ void yaw_loop(){
 void web_loop(){
   webserver.handleClient();
   websocket.loop();
-  webSocketClient.loop();// The websocket client continuously makes requests.
+  web_sockets_client_loop();// The websocket client continuously makes requests.
   rp.spinOnce();//Update the control information returned by the web end
 }
 
@@ -624,11 +593,7 @@ void bat_check()
 {
   if(bat_check_num > 10)
   {
-    //Voltage reading
-    uint32_t sum = 0;
-    sum= analogRead(BAT_PIN);
-    uint32_t voltage = esp_adc_cal_raw_to_voltage(sum, &adc_chars);
-    double battery=(voltage*3.97)/1000.0;
+    double battery= rp.get_battery_voltage();
 
     Serial.println(battery);
     //Battery display

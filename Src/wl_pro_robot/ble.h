@@ -35,6 +35,8 @@ enum BLE_CMD
 {
   CMD_MANEUVER=0,
   CMD_WIFI=1,
+  CMD_DEVICE_INFO=2,
+  CMD_RESTART=9,
 };
 
 typedef struct BleDataTypDef{
@@ -53,6 +55,9 @@ void ble_init() ;
 //void ble_send_data(uint8_t* data, uint8_t len);
 void ble_loop(void);
 void ble_test(void);
+
+void ble_send_string(const String &message);
+
 extern BleDataTypDef ble_rx;
 
 

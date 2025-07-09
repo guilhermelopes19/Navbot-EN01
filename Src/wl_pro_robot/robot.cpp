@@ -3,6 +3,10 @@
 #include <ArduinoJson.h>
 #include "wifi.h"
 #include "eeprom_util.h"
+
+int uncontrolable = 0;
+int BAT_PIN = 35;
+esp_adc_cal_characteristics_t adc_chars;
 Wrobot wrobot;
 RobotProtocol rp(20);
 
@@ -79,7 +83,64 @@ int RobotProtocol::checkBufRefresh(void)
     }
     return ret;
 }
+// This undocumented internal function must be declared
+extern "C" {
+uint8_t temprature_sens_read();
+}
 
+double RobotProtocol::get_fahrenheit() {
+  return temprature_sens_read();
+}
+
+double RobotProtocol::get_degree_centigrade() {
+  double fahrenheit = get_fahrenheit();
+  // Convert to Celsius (unit: Fahrenheit)
+  return (fahrenheit - 32) / 1.8;
+}
+
+double RobotProtocol::get_battery_voltage() {
+  // Voltage reading
+  uint32_t sum = 0;
+  sum = analogRead(BAT_PIN);
+  uint32_t voltage = esp_adc_cal_raw_to_voltage(sum, &adc_chars);
+  return (voltage * 3.97) / 1000.0;
+}
+
+double RobotProtocol::get_battery_level() {
+  double currentVoltage = get_battery_voltage();
+  double maxVoltage = 12.57;
+  double minVoltage = 7.0;
+
+  // Ensure the voltage is within a reasonable range
+  if (currentVoltage >= maxVoltage) return 100.0;
+  if (currentVoltage <= minVoltage) return 0.0;
+
+  // Calculate the percentage
+  double battery_percentage = (currentVoltage - minVoltage) / (maxVoltage - minVoltage) * 100.0;
+
+  battery_percentage = round(battery_percentage) / 1; // Format to retain two significant digits (rounded to 2 decimal places)
+
+  // Battery logic correction (prevent out-of-bounds and display of 0 data)
+  if (battery_percentage > 100) {
+    battery_percentage = 100;
+  } else if (battery_percentage < 1) {
+    battery_percentage = 1;
+  }
+  return battery_percentage;
+}
+
+int RobotProtocol::get_robot_status() {
+  // 0 - Normal state, 1 - Primary out-of-control state (tilting), 2 - Recovery waiting state
+  int robot_status = -1;
+  if (uncontrolable == 0) {
+    robot_status = 0;
+  } else if (uncontrolable == 1) {
+    robot_status = 1;
+  } else if (uncontrolable > 1) {
+    robot_status = 2;
+  }
+  return robot_status;
+}
 
 void RobotProtocol::printDoc(StaticJsonDocument<300> &doc){
     char receive_command[300];
@@ -131,6 +192,8 @@ void RobotProtocol::isSys(StaticJsonDocument<300> &doc) {
         Serial.println(eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_URL));
     } else if (type == MESSAGE_TYPE.SYS_RESTART) {
         ESP.restart();
+    } else if (type == MESSAGE_TYPE.GET_DEVICE_INFO) {
+        feedback_util_send_message(FEEDBACK_CHANNEL.ALL);
     }
 }
 

@@ -7,6 +7,7 @@
 #include "EEPROM.h"
 #include "robot.h"
 #include "eeprom_util.h"
+#include "feedback_util.h"
 
 BLEServer *pServer = NULL;
 BLECharacteristic * pTxCharacteristic;
@@ -28,6 +29,8 @@ BleDataTypDef ble_rx;
 void ble_rx_data_clear(void);
 void ble_cmd_maneuver_processing(void);
 void ble_cmd_wifi_processing(void);
+void ble_cmd_send_device_info(void);
+void ble_cmd_restart(void);
 
 
 
@@ -183,6 +186,14 @@ void ble_loop(void)
         {
           ble_cmd_wifi_processing();
         }break;
+        case CMD_DEVICE_INFO:
+        {
+            ble_cmd_send_device_info();
+        }break;
+        case CMD_RESTART:
+        {
+            ble_cmd_restart();
+        }break;
       }
       //The data processing is completed and the status is changed to idle
       ble_rx.state = BLE_STATE_IDLE; 
@@ -279,17 +290,29 @@ void ble_cmd_wifi_processing(void)
     }
   }
 
-  //Save the wifi information
-    eeprom_util.write(&EepromParam.ADDR_WIFI_SSID, (const char*)ssid);
-    eeprom_util.write(&EepromParam.ADDR_WIFI_PASSWORD, (const char*)password);
-
-
-    Serial.print("READ SAVE WIFI SSID:");
-    Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_SSID));
-    Serial.print("READ SAVE WIFI PASSWORD:");
-    Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_PASSWORD));
+    StaticJsonDocument<300> doc;
+    doc["model"] = "basic";
+    doc["type"] = MESSAGE_TYPE.SYS_WIFI;
+    doc["ssid"] = (const char*)ssid;
+    doc["password"] = (const char*)password;
+    doc["state"] = WIFI_STATE.CLIENT;
+    rp.parseBasic(doc);
   extern char wifi_mode;
   if(wifi_mode == WIFI_STA) WiFi.disconnect();
+}
+
+void ble_cmd_send_device_info() {
+    StaticJsonDocument<300> doc;
+    doc["model"] = "basic";
+    doc["type"] = MESSAGE_TYPE.GET_DEVICE_INFO;
+    rp.parseBasic(doc);
+}
+
+void ble_cmd_restart() {
+    StaticJsonDocument<300> doc;
+    doc["model"] = "basic";
+    doc["type"] = MESSAGE_TYPE.SYS_RESTART;
+    rp.parseBasic(doc);
 }
 
 
@@ -299,5 +322,28 @@ void ble_test(void)
   while(1)
   {
     ble_loop();
+  }
+}
+
+void ble_send_string(const String &message) {
+  // Maximum payload size per packet (fixed 15 bytes)
+  const uint8_t MAX_PAYLOAD_SIZE = 15;
+  // Calculate total number of packets (round up)
+  uint16_t total_length = message.length();
+  uint8_t total_packets = (total_length + MAX_PAYLOAD_SIZE - 1) / MAX_PAYLOAD_SIZE;
+
+  // Return immediately if string is empty
+  if (total_packets == 0) return;
+
+  for (uint8_t packet_idx = 0; packet_idx < total_packets; packet_idx++) {
+    // Calculate current packet payload length
+    uint16_t start_pos = packet_idx * MAX_PAYLOAD_SIZE;
+    uint8_t payload_len = min(MAX_PAYLOAD_SIZE, (uint8_t)(total_length - start_pos));
+
+    // Send string fragment directly (no packet header)
+    ble_send_data((uint8_t * )(message.c_str() + start_pos), payload_len);
+
+    // Add short delay to prevent transmission congestion (adjust according to actual hardware)
+    delay(10);
   }
 }

@@ -3,6 +3,8 @@
 
 #include <WiFi.h>
 #include <ArduinoJson.h>
+#include "esp_adc_cal.h"
+#include "feedback_util.h"
 
 typedef struct {
   int height = 38;
@@ -35,6 +37,7 @@ struct {
     String SYS_WIFI = "sys_wifi";
     String SYS_WEB_SOCKET_SERVER = "sys_web_socket_server";
     String SYS_RESTART = "sys_restart";
+    String GET_DEVICE_INFO = "get_device_info";
 } MESSAGE_TYPE;
 
 
@@ -50,6 +53,11 @@ class RobotProtocol
 		RobotProtocol(uint8_t len);
 		~RobotProtocol();
 		void spinOnce(void);
+		double get_fahrenheit(void);
+		double get_degree_centigrade(void);
+		double get_battery_voltage(void);
+		double get_battery_level(void);
+		int get_robot_status(void);
 		void printDoc(StaticJsonDocument<300> &doc);
 		void isSys(StaticJsonDocument<300> &doc);
 		void parseBasic(StaticJsonDocument<300> &doc);
@@ -61,6 +69,11 @@ class RobotProtocol
     void UART_WriteBuf(void);
     int checkBufRefresh(void);
 };
+
+
+extern int uncontrolable;          //Too much tilt and loss of control
+extern int BAT_PIN;    // select the input pin for the ADC
+extern esp_adc_cal_characteristics_t adc_chars;
 
 extern Wrobot wrobot;
 extern RobotProtocol rp;
