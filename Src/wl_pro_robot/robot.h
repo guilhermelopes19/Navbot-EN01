@@ -50,8 +50,18 @@ typedef enum {
 class RobotProtocol
 {
 	public:
+    double battery_voltage;
+    double pcb_version;
+    double fahrenheit;
+    double centigrade;
+    double battery_level;
+    int    status;
+
+
+
 		RobotProtocol(uint8_t len);
 		~RobotProtocol();
+    double get_pcb_version();
 		void spinOnce(void);
 		double get_fahrenheit(void);
 		double get_degree_centigrade(void);
@@ -61,7 +71,7 @@ class RobotProtocol
 		void printDoc(StaticJsonDocument<300> &doc);
 		void isSys(StaticJsonDocument<300> &doc);
 		void parseBasic(StaticJsonDocument<300> &doc);
-;
+    void parseJson(StaticJsonDocument<300> &doc);
   private:
     uint8_t *_now_buf;
     uint8_t *_old_buf;

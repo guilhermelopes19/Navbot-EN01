@@ -23,20 +23,23 @@ typedef struct CmdWifiTypDef{
 }CmdWifiTypDef;
 
 
-enum BLE_STATE
-{
+enum BLE_STATE{
   BLE_OFF_LINE=0,
-  BLE_STATE_IDLE,
-  BLE_STATE_RECEIVE_OK,
-  BLE_STATE_RECEIVE_WAIT,
-  BLE_STATE_WAITING_PROCEDD,
+  BLE_STATE_IDLE=1,
+  BLE_STATE_RECEIVE_OK=2,
+  BLE_STATE_RECEIVE_WAIT=3,
+  BLE_STATE_WAITING_PROCEDD=4,
+
+  BLE_STATE_SEND_READY=20,
+  BLE_STATE_SEND_BEING=21,
+  BLE_STATE_SEND_FINISH=22
 };
-enum BLE_CMD
-{
+enum BLE_CMD{
+  CMD_RESTART=-1,
   CMD_MANEUVER=0,
   CMD_WIFI=1,
-  CMD_DEVICE_INFO=2,
-  CMD_RESTART=9,
+  CMD_JSON=2,
+  CMD_ACK = 0x7F
 };
 
 typedef struct BleDataTypDef{
@@ -51,14 +54,16 @@ typedef struct BleDataTypDef{
 }BleDataTypDef;
 
 
-void ble_init() ;
+void ble_init();
 //void ble_send_data(uint8_t* data, uint8_t len);
 void ble_loop(void);
 void ble_test(void);
 
 void ble_send_string(const String &message);
+void ble_rx_add_string(String str);
+void ble_rx_add_data(char *data,int len);
 
-extern BleDataTypDef ble_rx;
+extern BleDataTypDef ble_rx,ble_tx;
 
 
 

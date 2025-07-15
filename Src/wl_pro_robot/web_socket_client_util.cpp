@@ -26,7 +26,7 @@ void eventCallback(WStype_t type, uint8_t *payload, size_t length) {
         printf("eFuse Two Point: Supported\n");
         String mode_str = doc["mode"];
         if (mode_str == "basic") {
-            rp.parseBasic(doc);
+            rp.parseJson(doc);
         }
     }
 }

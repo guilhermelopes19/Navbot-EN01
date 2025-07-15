@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "oled_16064.h"
@@ -33,13 +32,18 @@ void cpu0_task(void *ptParam) {
   OLED_Init();
   while (1) {
     maneuver_to_expression();
-
     file.read(file_header, 8);
     frames_num = *(uint32_t *)(file_header);
     width = *(uint16_t *)(file_header + 4);
     height = *(uint16_t *)(file_header + 6);
     frames_size = width * height / 2;
     x_coord = (160 - width) / 2;
+
+    if(!file || !frames_num || !height || !width)
+    {
+      OLED_ShowString(0,0,"No file ...",16,0);
+      continue;
+    }
 
     if (last_frames_width != width) {
       OLED_Fill(0, 0, OLED_W, OLED_H, 0x00);

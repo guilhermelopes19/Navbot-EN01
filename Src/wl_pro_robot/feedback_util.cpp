@@ -37,22 +37,23 @@ String get_device_info() {
   degree_centigrade = round(degree_centigrade * 100) / 100;
 
   // Add simple values
-  doc["BatteryPercentage"] = battery_percentage;
-  doc["BatteryVoltage"] = battery_voltage;
-  doc["Temperature"] = degree_centigrade;
-  doc["Status"] = rp.get_robot_status();
+  doc["pcb_version"] = rp.pcb_version;
+  doc["battery_level"] = rp.battery_level;
+  doc["battery_voltage"] = rp.battery_voltage;
+  doc["centigrade"] = rp.centigrade;
+  doc["status"] = rp.status;
 
   doc["ESP32"] = "2.0.3";
-  doc["Main"] = "1.0.0.0";
+  doc["main"] = "1.0.0.0";
   doc["GPS"] = "--";
-  doc["Mac"] = get_dev_mac();
+  doc["mac"] = get_dev_mac();
 
   serializeJson(doc, jsonStr);
   return jsonStr;
 }
 
 // Send all information
-void feedback_util_send_message(int send_channel = FEEDBACK_CHANNEL.ALL) {
+void feedback_util_send_message(int send_channel = FEEDBACK_CHANNEL.BLE) {
   // Get device information and send
   String device_info = get_device_info();
 
@@ -62,9 +63,9 @@ void feedback_util_send_message(int send_channel = FEEDBACK_CHANNEL.ALL) {
   // Send data according to the specified channel
   if (FEEDBACK_CHANNEL.ALL == send_channel) {
     web_sockets_client_send_message(device_info);
-    ble_send_string(device_info);
+    ble_rx_add_string(device_info);
   } else if (FEEDBACK_CHANNEL.BLE == send_channel) {
-    ble_send_string(device_info);
+    ble_rx_add_string(device_info);
   } else if (FEEDBACK_CHANNEL.WEB_SOCKET_CLIENT == send_channel) {
     web_sockets_client_send_message(device_info);
   }
