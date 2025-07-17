@@ -163,6 +163,7 @@ void setup() {
   // delay(3000);
   Serial.begin(115200);
   Serial2.begin(1000000);
+  rp.get_pcb_version();
   xTaskCreatePinnedToCore(cpu0_task, "cpu0_task", 1024 * 4, NULL, 0, NULL, 0);
 
   ble_init();

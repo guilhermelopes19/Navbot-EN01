@@ -82,7 +82,11 @@ extern "C" {
 }
 
 double RobotProtocol::get_pcb_version(){
-  return;
+  int sensorValue = analogRead(A0);
+  pcb_version = sensorValue * (3.3 / 4096) +1;
+  Serial.println("pcb_version:");
+  Serial.println(pcb_version);
+  return pcb_version;
 }
 
 double RobotProtocol::get_fahrenheit() {
