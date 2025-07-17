@@ -39,27 +39,18 @@ bool ble_frames_validation(void);
 class MyCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pCharacteristic) {
     uint8_t* rxData = pCharacteristic->getData();
-
+    Serial.println("onWrite()");
     if (pCharacteristic->getLength() == 20) {
       int i;
       for (i = 0; i < 20; i++) {
         ble_rx.frame[i] = *(rxData + i);  //Transfer data
       }
       if (ble_rx.remaining_pack == 0) {
-        ble_rx.remaining_pack = ble_rx.frame[3];
+        ble_rx.remaining_pack = ble_rx.frame[3]; 
       }
       //Status setting and acquisition commands
       ble_rx.state = BLE_STATE_RECEIVE_OK;
       ble_rx.cmd = ble_rx.frame[2];
-    }
-  }
-
-
-  void onStatus(BLECharacteristic* pCharacteristic, Status status, uint32_t code) {
-    // 当数据发送完成且客户端确认接收后触发
-    if (status == BLECharacteristicCallbacks::SUCCESS_NOTIFY && code == ESP_GATT_OK) {
-      Serial.println("ble数据包发送完成!");
-      // 在这里添加发送完成后的处理代码
     }
   }
 };
@@ -93,8 +84,7 @@ static void dev_name_build(char ble_name[]) {
   }
 
   sprintf(ble_name, "%s%s", basc, mac);
-  Serial.printf(ble_name);
-  Serial.printf("\r\n");
+  Serial.println(ble_name);
 }
 
 void ble_init() {
@@ -187,15 +177,18 @@ void ble_rx_processing(void) {
   }
 }
 void ble_tx_processing(void) {
-  if (ble_tx.state == BLE_STATE_SEND_READY) {
+  
+  if (ble_tx.state == BLE_STATE_SEND_READY && deviceConnected == true) {
     // `ble_tx.index` is the index of the current data being sent.
     //If it is greater than or equal to the total length,
     //it indicates that the sending is complete or there is no data to be sent.
     if (ble_tx.index >= ble_tx.len) {
       ble_tx.state = BLE_STATE_SEND_FINISH;
+      Serial.printf("finish!!!  ble_tx.index >= ble_tx.len  , ble_tx.index : %d , ble_tx.len : %d \r\n",ble_tx.index , ble_tx.len);
       return;
     }
 
+    Serial.println("ble send frame");
     ble_tx.state = BLE_STATE_SEND_BEING;
 
     ble_tx.frame[0] = 0x55;
@@ -207,6 +200,7 @@ void ble_tx_processing(void) {
 
     memcpy(&ble_tx.frame[5], &ble_tx.data[ble_tx.index], 15);
 
+    ble_send_data((uint8_t*)ble_tx.frame, 20);
     ble_tx.index += 15;
   }
 }
@@ -346,7 +340,7 @@ void ble_cmd_wifi_processing(void) {
   rp.parseJson(doc);
 }
 
-void  ble_cmd_json_processing(void) {
+void ble_cmd_json_processing(void) {
   String payload_str = String((char*)ble_rx.data);
   StaticJsonDocument<300> doc;
   deserializeJson(doc, payload_str);
@@ -362,14 +356,17 @@ void ble_cmd_restart_processing() {
 
 void ble_tx_add_data(char* data, int len) {
   memcpy(ble_tx.data, data, len);
-  ble_tx.len = len;
+  ble_tx.len   = len;
+  ble_tx.index = 0 ;
   ble_tx.state = BLE_STATE_SEND_READY;
 }
 void ble_rx_add_string(String str) {
-  char buffer[300]; 
+  char buffer[300] = { 0 };
   int len = str.length();
   str.toCharArray(buffer, len);
   ble_tx_add_data(buffer, len);
+  Serial.println("ble_tx_add_data:");
+  Serial.println(buffer);
 }
 
 
@@ -377,41 +374,29 @@ void ble_rx_add_string(String str) {
 
 /*****************************************************      test    ***************************************************************/
 bool one_second_tick(void);
+bool ten_msec_tick(void);
 void test_rx_json(char* data);
 
 
 
 void ble_test(void) {
+  return;
+  Serial.begin(115200);
   ble_init();
   while (1) {
-    if(one_second_tick()){
+    if(ten_msec_tick()){
+      ble_loop();
+    }
+    if (one_second_tick()) {
+
       test_rx_json("{\"type\":\"get_device_info\"}");
     }
-    ble_loop();
+    
   }
 }
-
-
-void test_rx_json(char* data)
-{
+void test_rx_json(char* data) {
   String payload_str = String(data);
   StaticJsonDocument<300> doc;
   deserializeJson(doc, payload_str);
   rp.parseJson(doc);
-}
-//Generate a one-second tick
-bool one_second_tick(void) {
-  static unsigned long lastMillis = 0;
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - lastMillis >= 1000) {
-    lastMillis = currentMillis;
-    return 1;
-  }
-  //Overflow handling
-  if (lastMillis > currentMillis) {
-    lastMillis = currentMillis;
-  }
-
-  return 0;
 }

@@ -81,6 +81,10 @@ extern "C" {
   uint8_t temprature_sens_read();
 }
 
+double RobotProtocol::get_pcb_version(){
+  return;
+}
+
 double RobotProtocol::get_fahrenheit() {
   return temprature_sens_read();
 }
@@ -184,12 +188,11 @@ void RobotProtocol::isSys(StaticJsonDocument<300> &doc) {
   } else if (type == MESSAGE_TYPE.SYS_RESTART) {
     ESP.restart();
   } else if (type == MESSAGE_TYPE.GET_DEVICE_INFO) {
-    feedback_util_send_message();
+    feedback_util_send_message(FEEDBACK_CHANNEL.BLE);
   }
 }
 void RobotProtocol::parseJson(StaticJsonDocument<300> &doc) {
-  String type = doc["type"];
-  if (type == "null") {
+  if (doc["type"].isNull() == true) {
     parseBasic(doc);
   } else {
     isSys(doc);

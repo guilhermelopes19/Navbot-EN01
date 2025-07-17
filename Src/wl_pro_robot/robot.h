@@ -38,6 +38,8 @@ struct {
     String SYS_WEB_SOCKET_SERVER = "sys_web_socket_server";
     String SYS_RESTART = "sys_restart";
     String GET_DEVICE_INFO = "get_device_info";
+    String OFF_SERVO = "off_servo";
+    String CALIBRATION_SERVO = "calibrate_servo";
 } MESSAGE_TYPE;
 
 

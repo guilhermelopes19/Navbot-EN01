@@ -93,6 +93,7 @@ void lpfRoll(char* cmd) {
   command.lpf(&lpf_roll, cmd);
 }
 bool one_second_tick(void);
+bool ten_msec_tick(void);
 //void Stabtest_zeropoint(char* cmd) { command.pid(&test_zeropoint, cmd); }
 
 //WebServer instance
@@ -157,7 +158,7 @@ static const adc_unit_t unit = ADC_UNIT_1;
 
 void setup() {
 
-  ble_test();
+  // ble_test();
 
   // delay(3000);
   Serial.begin(115200);
@@ -278,9 +279,12 @@ void loop() {
     bat_check();  //Voltage detection
     wifi_loop();
   }
+  if(ten_msec_tick()){
+    ble_loop();
+  }
 
   web_loop();  //Web data update
-  ble_loop();
+  
   mpu6050.update();    //IMU data update
   lqr_balance_loop();  //lqr self-balancing control
   yaw_loop();          //yaw axis steering control
@@ -604,7 +608,23 @@ bool one_second_tick(void) {
   static unsigned long lastMillis = 0;
   unsigned long currentMillis = millis();
 
-  if (currentMillis - lastMillis >= 1000) {
+  if (currentMillis - lastMillis >= 5000) {
+    lastMillis = currentMillis;
+    return 1;
+  }
+  //Overflow handling
+  if (lastMillis > currentMillis) {
+    lastMillis = currentMillis;
+  }
+
+  return 0;
+}
+//milliseconds
+bool ten_msec_tick(void) {
+  static unsigned long lastMillis = 0;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastMillis >= 10) {
     lastMillis = currentMillis;
     return 1;
   }
