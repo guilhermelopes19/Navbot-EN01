@@ -49,8 +49,8 @@
 7. Manually stabilize the robot, with the wheels slightly touching the ground. Click the "Robot go!" button on the web page, and the robot will stand up. You can then control the robot's movement using the joystick.
 
 ### Discord link
-| Link:[https://discord.gg/cWGK4yER62](https://discord.gg/cWGK4yER62)        |
-| ------------ |
+| Link: [https://discord.gg/cWGK4yER62](https://discord.gg/cWGK4yER62)        |
+| :------------: |
 | <img src="Docs/Image/Discord link.png" height="200"/> |
 
 ### Guidance Viedeo & Blog
