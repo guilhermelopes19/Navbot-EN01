@@ -92,6 +92,7 @@ void StabRollAngle(char* cmd) {
 void lpfRoll(char* cmd) {
   command.lpf(&lpf_roll, cmd);
 }
+
 bool one_second_tick(void);
 bool ten_msec_tick(void);
 //void Stabtest_zeropoint(char* cmd) { command.pid(&test_zeropoint, cmd); }
@@ -156,6 +157,32 @@ static const adc_unit_t unit = ADC_UNIT_1;
 //Power display LED Pin
 #define LED_BAT 13
 
+void user_function(char* cmd) {
+  switch(*cmd)
+  {
+    case '1':
+    {
+      Serial.println("off all servo");
+      sms_sts.off_all_servo();
+    }break;
+    case '2':
+    {
+      Serial.println("on all servo");
+      sms_sts.on_all_servo();
+    }break;
+    case '3':
+    {
+      Serial.println("calibrate all servo");
+      sms_sts.calibrate_all_servo();
+    }break;
+    case '4':
+    {
+
+    }break;
+
+  }
+}
+
 void setup() {
 
   // ble_test();
@@ -189,8 +216,8 @@ void setup() {
   ACC[1] = 30;
   Speed[0] = 300;
   Speed[1] = 300;
-  Position[0] = 2148;
-  Position[1] = 1948;
+  Position[0] =2048;
+  Position[1] =2048;
   //The steering gear (ID1/ID2) runs to their respective positions at maximum speed V=2400 steps/SEC and \
   acceleration A=50(50*100 steps/SEC ^2)
   sms_sts.SyncWritePosEx(ID, 2, Position, Speed, ACC);
@@ -266,6 +293,7 @@ void setup() {
   command.add('J', lpfZeropoint, "lpf zeropoint");
   command.add('K', StabRollAngle, "pid roll angle");
   command.add('L', lpfRoll, "lpf roll");
+  command.add('U', user_function, "user function");
 
   //command.add('M', Stabtest_zeropoint, "test_zeropoint");
 
