@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include "wifi.h"
 #include "eeprom_util.h"
+#include "Servo_STS3032.h"
 
 int uncontrolable = 0;
 int BAT_PIN = 35;
@@ -84,7 +85,7 @@ extern "C" {
 double RobotProtocol::get_pcb_version(){
   int sensorValue = analogRead(A0);
   pcb_version = sensorValue * (3.3 / 4096) +1;
-  Serial.println("pcb_version:");
+  Serial.print("pcb_version:");
   Serial.println(pcb_version);
   return pcb_version;
 }
@@ -148,7 +149,6 @@ void RobotProtocol::printDoc(StaticJsonDocument<300> &doc) {
 
 void RobotProtocol::isSys(StaticJsonDocument<300> &doc) {
   String type = doc["type"];
-  Serial.println("isSys");
   Serial.print("type:");
   Serial.println(type);
 
@@ -193,6 +193,14 @@ void RobotProtocol::isSys(StaticJsonDocument<300> &doc) {
     ESP.restart();
   } else if (type == MESSAGE_TYPE.GET_DEVICE_INFO) {
     feedback_util_send_message(FEEDBACK_CHANNEL.BLE);
+  } else if (type == MESSAGE_TYPE.OFF_SERVO) {
+    sms_sts.off_all_servo();
+  } else if (type == MESSAGE_TYPE.ON_SERVO) {
+    sms_sts.on_all_servo();
+  } else if (type == MESSAGE_TYPE.CALIBRATION_SERVO) {
+    sms_sts.calibrate_all_servo();
+    delay(2);
+    sms_sts.on_all_servo();
   }
 }
 void RobotProtocol::parseJson(StaticJsonDocument<300> &doc) {
