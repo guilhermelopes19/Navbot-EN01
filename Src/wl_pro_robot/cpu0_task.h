@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "oled_16064.h"
@@ -9,12 +8,15 @@
 
 void maneuver_to_expression(void);
 void delayed_sleep_mode(void);
+bool refresh_maneuver_state(void);
 
 #define SLEEP_COUNT_DOWN 5
+
 uint16_t sleep_time;
 
 
 File file;
+int maneuver_state = 0;
 int frames_time = 500;
 uint8_t last_frames_width;
 void cpu0_task(void *ptParam) {
@@ -33,13 +35,18 @@ void cpu0_task(void *ptParam) {
   OLED_Init();
   while (1) {
     maneuver_to_expression();
-
     file.read(file_header, 8);
     frames_num = *(uint32_t *)(file_header);
     width = *(uint16_t *)(file_header + 4);
     height = *(uint16_t *)(file_header + 6);
     frames_size = width * height / 2;
     x_coord = (160 - width) / 2;
+
+    if(!file || !frames_num || !height || !width)
+    {
+      OLED_ShowString(0,0,"No file ...",16,0);
+      continue;
+    }
 
     if (last_frames_width != width) {
       OLED_Fill(0, 0, OLED_W, OLED_H, 0x00);
@@ -49,6 +56,7 @@ void cpu0_task(void *ptParam) {
       file.read(frames_data, frames_size);
       OLED_DrawBMP(x_coord, 0, width, height, frames_data, 0);
       delay(frames_time);
+      if(refresh_maneuver_state() == true) break; //Need to update the emoticons. End and continue to display.
     }
     last_frames_width = width;
     file.close();
@@ -72,12 +80,12 @@ enum {
   DANCE2 = 0x0200,
   DANCE3 = 0x0400,
   DANCE4 = 0x0800,
-} maneuver_state;
+}ManeuverStateTypDef;
 
-void maneuver_to_expression(void) {
-  int maneuver_state = 0;
-  frames_time = 50;
+bool refresh_maneuver_state(void){
+  static int last_maneuver_state;
 
+  maneuver_state = 0;
   if (wrobot.go > 0) {
     sleep_time = SLEEP_COUNT_DOWN;
     maneuver_state |= GO;
@@ -98,7 +106,18 @@ void maneuver_to_expression(void) {
   else if (wrobot.height < 38)
     maneuver_state |= DECLINE;
 
+  if(last_maneuver_state != maneuver_state){
+    last_maneuver_state = maneuver_state;
+    return true;
+  }
+  return false;
+}
 
+
+void maneuver_to_expression(void) {
+  
+  refresh_maneuver_state();
+  frames_time = 50;
 
   if (!(maneuver_state & GO)) {
     delayed_sleep_mode();
