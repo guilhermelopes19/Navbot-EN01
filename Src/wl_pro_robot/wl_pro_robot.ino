@@ -172,16 +172,16 @@ void user_function(char* cmd) {
       Serial.println("calibrate all servo");
       sms_sts.calibrate_all_servo();
     }break;
-    case '4':
-    {
-      Serial.println("set servo id 2");
-      sms_sts.set_servo_id(1,2);
-    }break;
-    case '5':
-    {
-      Serial.println("set servo id 1");
-      sms_sts.set_servo_id(2,1);
-    }break;
+    // case '4':
+    // {
+    //   Serial.println("set servo id 2");
+    //   sms_sts.set_servo_id(1,2);
+    // }break;
+    // case '5':
+    // {
+    //   Serial.println("set servo id 1");
+    //   sms_sts.set_servo_id(2,1);
+    // }break;
 
   }
 }
@@ -461,11 +461,11 @@ void leg_loop() {
     ACC[1] = 5;
     Speed[0] = 150;
     Speed[1] = 150;
-    float roll_angle = (float)mpu6050.getAngleX() + 2.0;
+    float roll_angle = (float)mpu6050.getAngleX() + 2.0 + rp.offset_roll;
     // leg_position_add += pid_roll_angle(roll_angle);
     leg_position_add = pid_roll_angle(lpf_roll(roll_angle));  //test
-    Position[0] = 2048 + 12 + 8.4 * (wrobot.height - 32) - leg_position_add;
-    Position[1] = 2048 - 12 - 8.4 * (wrobot.height - 32) - leg_position_add;
+    Position[0] = 2048  + 8.4 * (wrobot.height - 32) - leg_position_add;
+    Position[1] = 2048  - 8.4 * (wrobot.height - 32) - leg_position_add;
     if (Position[0] < 2110)
       Position[0] = 2110;
     else if (Position[0] > 2510)

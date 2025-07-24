@@ -84,7 +84,7 @@ extern "C" {
 
 double RobotProtocol::get_pcb_version(){
   int sensorValue = analogRead(A0);
-  pcb_version = sensorValue * (3.3 / 4096) +1;
+  pcb_version = sensorValue * (3.30 / 4096) +1;
   Serial.print("pcb_version:");
   Serial.println(pcb_version);
   return pcb_version;
@@ -246,7 +246,8 @@ void RobotProtocol::parseBasic(StaticJsonDocument<300> &doc) {
   wrobot.height = height;
 
   int roll = doc["roll"];
-  wrobot.roll = roll;
+  rp.offset_roll = roll;
+
   if (roll >= 0) {
     _now_buf[5] = 0;
   } else {

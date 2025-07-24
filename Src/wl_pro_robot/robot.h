@@ -59,6 +59,7 @@ class RobotProtocol
     double centigrade;
     double battery_level;
     int    status;
+    int16_t offset_roll = 0;
 
 
 
