@@ -41,11 +41,11 @@ String get_device_info() {
   doc["battery_level"] = rp.battery_level;
   doc["battery_voltage"] = rp.battery_voltage;
   doc["centigrade"] = rp.centigrade;
-  doc["status"] = rp.status;
+  // doc["status"] = rp.status;
 
-  doc["ESP32"] = "2.0.3";
-  doc["main"] = "1.0.0.0";
-  doc["GPS"] = "--";
+  // doc["ESP32"] = "2.0.3";
+  // doc["main"] = "1.0.0.0";
+  // doc["GPS"] = "--";
   doc["mac"] = get_dev_mac();
 
   serializeJson(doc, jsonStr);
