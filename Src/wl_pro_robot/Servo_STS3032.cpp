@@ -2,7 +2,8 @@
 //STS3032 Servo synchronous control command
 #include "Servo_STS3032.h"
 #include <stddef.h>
-
+//STS steering engine instance
+SMS_STS sms_sts;
 //STS3032 Serial servo communication layer protocol program
 SCS::SCS()
 {
@@ -103,6 +104,9 @@ void SCSerial::wFlushSCS()
 void SMS_STS::SyncWritePosEx(u8 ID[], u8 IDN, s16 Position[], u16 Speed[], u8 ACC[])
 {
     u8 offbuf[7*IDN];
+	if(servo_sw == 0 )
+		return;
+
     for(u8 i = 0; i<IDN; i++){
 		if(Position[i]<0){
 			Position[i] = -Position[i];
@@ -125,4 +129,41 @@ void SMS_STS::SyncWritePosEx(u8 ID[], u8 IDN, s16 Position[], u16 Speed[], u8 AC
     }
     syncWrite(ID, IDN, SMS_STS_ACC, offbuf, 7);
 }
+
+//Write "0" to address SMS_STS_TORSION_SW to turn off the servo.
+
+void SMS_STS::off_all_servo(void)
+{
+	servo_sw = 0;
+	u8 ID[2] = {1,2};
+	u8 offbuf[2] = {0,0};
+	syncWrite(ID, 2, SMS_STS_TORSION_SW, offbuf, 1);
+}
+
+//Write "1" to address SMS_STS_TORSION_SW to start the servo motor.
+void SMS_STS::on_all_servo(void)
+{
+	servo_sw = 1;
+	u8 ID[1] = {254};
+	u8 offbuf[1] = {1};
+	syncWrite(ID, 1, SMS_STS_TORSION_SW, offbuf, 1);
+}
+//Write "128" to address SMS_STS_TORSION_SW set the calibration servo to 2048.
+void SMS_STS::calibrate_all_servo(void)
+{
+	u8 ID[2] = {1,2};
+	u8 offbuf[2] = {128,128};
+	syncWrite(ID, 2, SMS_STS_TORSION_SW, offbuf, 1);
+}
+void SMS_STS::set_servo_id(u8 old_id, u8 new_id)
+{
+	u8 ID[1] = {old_id};
+	u8 offbuf[1] = {new_id};
+	syncWrite(ID, 1, SMS_STS_ID, offbuf, 1);
+}
+
+
+
+
+
 

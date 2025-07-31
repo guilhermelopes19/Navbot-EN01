@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-#define SPI_SCK  0
+#define SPI_SCK  2
 #define SPI_MOSI 4
 // #define SPI_MISO -1
 #define SPI_CS   21
