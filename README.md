@@ -48,6 +48,10 @@
 6. Open a browser connected to the robot's WiFi network and navigate to 192.168.1.11. The remote control interface is compatible with Android, iOS, Windows, Linux, macOS, etc., and it is recommended to use Chrome or Firefox.
 7. Manually stabilize the robot, with the wheels slightly touching the ground. Click the "Robot go!" button on the web page, and the robot will stand up. You can then control the robot's movement using the joystick.
 
+### Discord link
+| Link: [https://discord.gg/cWGK4yER62](https://discord.gg/cWGK4yER62)        |
+| :------------: |
+| <img src="Docs/Image/Discord link.png" height="200"/> |
 
 ### Guidance Viedeo & Blog
 Video: [DIY Education Nano 01 - Modular Wheel-Leg Robot for STEM​](https://www.youtube.com/watch?v=cPD-h2ZjIqo)
@@ -55,6 +59,8 @@ Video: [DIY Education Nano 01 - Modular Wheel-Leg Robot for STEM​](https://www
 Blog:  [Building a Tabletop Wheel-Legged Robot from Scratch​](https://frankfu.blog/embodied-ai-robot/building-a-tabletop-wheel-legged-robot-from-scratch/)  
 
 Thanks for Mu Shibo & Li Yufeng：The original repository https://github.com/MuShibo/Micro-Wheeled_leg-Robot
+
+
 
 
 

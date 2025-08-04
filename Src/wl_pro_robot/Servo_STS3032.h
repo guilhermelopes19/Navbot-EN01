@@ -19,8 +19,11 @@ typedef	unsigned long u32;
 typedef	long s32;
 
 //Memory table definition
-#define SMS_STS_ACC 41
-#define INST_SYNC_WRITE 0x83
+#define SMS_STS_ID			5
+#define SMS_STS_TORSION_SW	40
+#define SMS_STS_ACC 		41
+
+#define INST_SYNC_WRITE 	0x83
 
 //STS3032 Serial servo communication layer protocol program
 class SCS{
@@ -74,8 +77,17 @@ public:
 //SMS/STS Series serial servo application layer program
 class SMS_STS : public SCSerial
 {
+protected:
+	u8 servo_sw = 1;
+
 public:
 	virtual void SyncWritePosEx(u8 ID[], u8 IDN, s16 Position[], u16 Speed[], u8 ACC[]);//Write multiple servo position instructions simultaneously
+	void off_all_servo(void);
+	void on_all_servo(void);
+	void calibrate_all_servo(void);
+	void set_servo_id(u8 old_id, u8 new_id);
 };
+
+extern SMS_STS sms_sts;
 
 #endif
