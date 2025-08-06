@@ -61,6 +61,8 @@ void feedback_util_send_message(int send_channel = FEEDBACK_CHANNEL.BLE) {
   // Serial.println(device_info);
 
   // Send data according to the specified channel
+  Serial.print("device info:");
+  Serial.println(device_info);
   if (FEEDBACK_CHANNEL.ALL == send_channel) {
     web_sockets_client_send_message(device_info);
     ble_rx_add_string(device_info);

@@ -122,30 +122,30 @@ void maneuver_to_expression(void) {
   if (!(maneuver_state & GO)) {
     delayed_sleep_mode();
   } else if (wrobot.uncontrolable == 1) {
-    file = SPIFFS.open("/10.bin", "r");
+    file = SPIFFS.open("/10.bin");
   } else if (maneuver_state & RISE) {
-    file = SPIFFS.open("/2.bin", "r");
+    file = SPIFFS.open("/2.bin");
   } else if (maneuver_state & ADVANCE) {
-    file = SPIFFS.open("/1.bin", "r");
+    file = SPIFFS.open("/1.bin");
   } else if (maneuver_state & RETREAT) {
-    file = SPIFFS.open("/2.bin", "r");
+    file = SPIFFS.open("/2.bin");
   } else if (maneuver_state & TERN_LEFT) {
-    file = SPIFFS.open("/3.bin", "r");
+    file = SPIFFS.open("/3.bin");
   } else if (maneuver_state & TERN_RIGHT) {
-    file = SPIFFS.open("/4.bin", "r");
+    file = SPIFFS.open("/4.bin");
   } else if (maneuver_state & DANCE1) {
-    file = SPIFFS.open("/10.bin", "r");
+    file = SPIFFS.open("/10.bin");
   } else if (maneuver_state & DANCE2) {
-    file = SPIFFS.open("/11.bin", "r");
+    file = SPIFFS.open("/11.bin");
   } else if (maneuver_state & DANCE3) {
-    file = SPIFFS.open("/12.bin", "r");
+    file = SPIFFS.open("/12.bin");
   } else if (maneuver_state & DANCE4) {
-    file = SPIFFS.open("/13.bin", "r");
+    file = SPIFFS.open("/13.bin");
   } else {
     if (maneuver_state & DECLINE) {
-      file = SPIFFS.open("/6.bin", "r");
+      file = SPIFFS.open("/6.bin");
     }else{
-      file = SPIFFS.open("/11.bin", "r");
+      file = SPIFFS.open("/11.bin");
     }
     
   }
@@ -153,13 +153,15 @@ void maneuver_to_expression(void) {
 
 void delayed_sleep_mode() {
   if (sleep_time > SLEEP_COUNT_DOWN / 2) {
-    file = SPIFFS.open("/10.bin", "r");
+    file = SPIFFS.open("/10.bin");
     sleep_time--;
   } else if (sleep_time > 0) {
-    file = SPIFFS.open("/13.bin", "r");
+    file = SPIFFS.open("/13.bin");
     sleep_time--;
   } else {
-    file = SPIFFS.open("/z.bin", "r");
+    file = SPIFFS.open("/z.bin");
     frames_time = 500;
   }
 }
+
+

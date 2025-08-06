@@ -67,29 +67,9 @@ class MyServerCallbacks : public BLEServerCallbacks {
   }
 };
 
-static void dev_name_build(char ble_name[]) {
-
-  char basc[] = "navbot_en01-";
-  uint8_t mac[7];
-  esp_read_mac(mac, ESP_MAC_BT);
-  mac[6] = 0;
-  char i;
-
-  for (i = 0; i < 6; i++)  //Convert the mac address to contain only 0-9/a-z
-  {
-    mac[i] = mac[i] % 36;  // 10+26=36
-
-    if (mac[i] <= 9) mac[i] = mac[i] + '0';             //0-9
-    else if (mac[i] <= 35) mac[i] = mac[i] - 10 + 'a';  //a-z
-  }
-
-  sprintf(ble_name, "%s%s", basc, mac);
-  Serial.println(ble_name);
-}
-
 void ble_init() {
   char ble_name[20] = { 0 };
-  dev_name_build(ble_name);
+  rp.get_dev_name(ble_name);
   // Create the BLE Device
   BLEDevice::init(ble_name);
   // Create the BLE Server

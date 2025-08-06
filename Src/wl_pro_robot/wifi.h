@@ -14,9 +14,13 @@ void wifi_loop(void);
 extern char wifi_ssid[50];
 extern char wifi_password[30];
 
-struct {
+typedef struct WIFI_STATE_TypeDef{
     String SERVER="server";
     String CLIENT="client";
     String CLOSE="close";
-}WIFI_STATE;
+}WIFI_STATE_TypeDef;
+
+extern WIFI_STATE_TypeDef WIFI_STATE;
+
+
 

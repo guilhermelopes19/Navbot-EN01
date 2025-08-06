@@ -6,6 +6,7 @@ char wifi_ssid[50]={0};
 char wifi_password[30]={0};
 char eeprom_once=0;
 
+WIFI_STATE_TypeDef WIFI_STATE;
 
 
 // Configure the parameters related to the AP (hotspot) mode
@@ -36,32 +37,10 @@ void wifi_set_sta()
 
 }
 
-static void dev_name_build(char dev_name[])
-{
-
-  char basc[] = "navbot_en01-";
-  uint8_t mac[7];
-  esp_read_mac(mac, ESP_MAC_BT);
-  mac[6] = 0;
-  char i;
-
-  for(i=0;i<6;i++) //Convert the mac address to contain only 0-9/a-z
-  {
-    mac[i] = mac[i]%36; // 10+26=36
-
-    if(mac[i]<=9)       mac[i] = mac[i] + '0'; //0-9
-    else if(mac[i]<=35)  mac[i] = mac[i] -10 + 'a'; //a-z
-  }
-
-  sprintf(dev_name,"%s%s",basc,mac);
-  Serial.printf(dev_name);
-  Serial.printf("\r\n");
-}
-
 void wifi_set_ap(void)
 {
   char ap_name[20]={0};
-  dev_name_build(ap_name);
+  rp.get_dev_name(ap_name);
   wifi_mode = WIFI_AP;
 	WiFi.mode(WIFI_AP); 
 	WiFi.softAPConfig(AP_IP, AP_GATEWAY, AP_SUBNET); 
@@ -72,7 +51,9 @@ void wifi_set_ap(void)
 }
 
 String get_wifi_state(void) {
-    String state = eeprom_util.read(& EepromParam.ADDR_WIFI_STATE);
+    char state_arr[EepromParam.ADDR_WIFI_STATE.size];
+    eeprom_util.read(& EepromParam.ADDR_WIFI_STATE,state_arr);
+    String state = state_arr;
     if(state.length() == 0){
         state = WIFI_STATE.SERVER;
     }
@@ -91,6 +72,11 @@ void wifi_init(void)
     else if(wifi_state == WIFI_STATE.SERVER)
     {
         Serial.println("start wifi server...");
+        wifi_set_ap(); // wifi server
+    }
+    else
+    {
+        Serial.println("wifi state error!");
         wifi_set_ap(); // wifi server
     }
 }

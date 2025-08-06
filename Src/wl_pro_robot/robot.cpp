@@ -4,6 +4,7 @@
 #include "wifi.h"
 #include "eeprom_util.h"
 #include "Servo_STS3032.h"
+#include "SPIFFS.h"
 
 int uncontrolable = 0;
 int BAT_PIN = 35;
@@ -120,7 +121,7 @@ double RobotProtocol::get_battery_level() {
   battery_percentage = round(battery_percentage) / 1;  // Format to retain two significant digits (rounded to 2 decimal places)
 
   // Battery logic correction (prevent out-of-bounds and display of 0 data)
-  if (battery_percentage > 100) {
+  if (battery_percentage > 100) { 
     battery_percentage = 100;
   } else if (battery_percentage < 1) {
     battery_percentage = 1;
@@ -146,7 +147,30 @@ void RobotProtocol::printDoc(StaticJsonDocument<300> &doc) {
   serializeJson(doc, receive_command);
   Serial.printf("receive_command:%s \r\n", receive_command);
 }
-
+ 
+bool create_and_write_file(const char* filePath, const char* content) {
+  // Open the file in write mode (if the file does not exist, it will be created)
+  File file = SPIFFS.open(filePath, FILE_WRITE);
+  // Write the content to the file
+  size_t bytesWritten = file.print(content);
+  file.close();
+  if (bytesWritten > 0) {
+    Serial.printf("Successfully wrote %d bytes to the file\n", bytesWritten);
+    return true;
+  } else {
+    Serial.println("An error occurred while writing to the file.");
+    return false;
+  }
+}
+void RobotProtocol::save_config_json(void)
+{
+  Serial.print("save config json :");
+  printDoc(config_json);
+  char json_arr[CONFIG_JSON_SIZE+1] = {0};
+  serializeJson(rp.config_json, json_arr);
+  Serial.println(json_arr);
+  eeprom_util.write(&EepromParam.ADDR_JSON,json_arr);
+}
 void RobotProtocol::isSys(StaticJsonDocument<300> &doc) {
   String type = doc["type"];
   Serial.print("type:");
@@ -201,6 +225,14 @@ void RobotProtocol::isSys(StaticJsonDocument<300> &doc) {
     sms_sts.calibrate_all_servo();
     delay(2);
     sms_sts.on_all_servo();
+  } else if (type == MESSAGE_TYPE.SET_NAME) {
+
+    if (doc["name"].isNull() == true) {
+      Serial.println("Invalid json data.");
+    }else{
+      config_json[CONFIG_KEY.NAME] = doc["name"];
+      save_config_json();
+    }
   }
 }
 void RobotProtocol::parseJson(StaticJsonDocument<300> &doc) {
@@ -210,6 +242,63 @@ void RobotProtocol::parseJson(StaticJsonDocument<300> &doc) {
     isSys(doc);
   }
 }
+void RobotProtocol::get_dev_name(char dev_name[])
+{
+  String name_str = config_json["name"];
+  name_str.toCharArray(dev_name,name_str.length());
+  Serial.print("BLE name :");
+  Serial.println(dev_name);
+}
+void build_dev_name(char dev_name[])
+{
+  char basc[] = "navbot_en01-";
+  uint8_t mac[7];
+  esp_read_mac(mac, ESP_MAC_BT);
+  mac[6] = 0;
+  char i;
+
+  for (i = 0; i < 6; i++)  //Convert the mac address to contain only 0-9/a-z
+  {
+    mac[i] = mac[i] % 36;  // 10+26=36
+
+    if (mac[i] <= 9) mac[i] = mac[i] + '0';             //0-9
+    else if (mac[i] <= 35) mac[i] = mac[i] - 10 + 'a';  //a-z
+  }
+  sprintf(dev_name, "%s%s", basc, mac);
+}
+void RobotProtocol:: config_json_init(void)
+{
+  eeprom_util.init(); 
+  String json_str = eeprom_util.read(&EepromParam.ADDR_JSON);
+  DeserializationError error = deserializeJson(config_json, json_str);
+  if(error)
+  {
+    Serial.println("The file was not found 'config.json'.");
+    char name[20];
+    build_dev_name(name);
+    String name_str = name;
+    config_json["name"] = name_str;
+    save_config_json(); 
+  }
+  printDoc(config_json);
+}
+void RobotProtocol::json_test(char* json_arr)
+{
+  Serial.println("json test :");
+  Serial.println(json_arr);
+  String payload_str = String(json_arr);
+  StaticJsonDocument<300> doc;
+  DeserializationError error = deserializeJson(doc, payload_str);
+  if(error)
+  {
+    Serial.println("json data error");
+  }else{
+    parseJson(doc);
+  }
+  
+  
+}
+
 void RobotProtocol::parseBasic(StaticJsonDocument<300> &doc) {
   // printDoc(doc);
   // isSys(doc);
@@ -300,3 +389,30 @@ void RobotProtocol::parseBasic(StaticJsonDocument<300> &doc) {
   }
   _now_buf[15] = abs(joy_y);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

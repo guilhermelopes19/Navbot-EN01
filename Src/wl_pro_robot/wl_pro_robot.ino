@@ -155,34 +155,9 @@ static const adc_unit_t unit = ADC_UNIT_1;
 #define LED_BAT 13
 
 void user_function(char* cmd) {
-  switch(*cmd)
+  if(*cmd == '{')
   {
-    case '1':
-    {
-      Serial.println("off all servo");
-      sms_sts.off_all_servo();
-    }break;
-    case '2':
-    {
-      Serial.println("on all servo");
-      sms_sts.on_all_servo();
-    }break;
-    case '3':
-    {
-      Serial.println("calibrate all servo");
-      sms_sts.calibrate_all_servo();
-    }break;
-    // case '4':
-    // {
-    //   Serial.println("set servo id 2");
-    //   sms_sts.set_servo_id(1,2);
-    // }break;
-    // case '5':
-    // {
-    //   Serial.println("set servo id 1");
-    //   sms_sts.set_servo_id(2,1);
-    // }break;
-
+    rp.json_test(cmd);
   }
 }
 
@@ -196,6 +171,7 @@ void setup() {
   rp.get_pcb_version();
   xTaskCreatePinnedToCore(cpu0_task, "cpu0_task", 1024 * 4, NULL, 0, NULL, 0);
 
+  rp.config_json_init();
   ble_init();
   wifi_init();
 
