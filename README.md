@@ -17,7 +17,7 @@
 
 ### PCB Documentation
 
-* The project requires the fabrication of four PCBs. Both the schematic and PCB source files are provided, and the design environment used is [LCEDA](https://lceda.cn/).
+* The project requires the fabrication of four PCBs. Both the schematic and PCB source files are provided, and the design environment used is [LCEDA](https://pro.easyeda.com).
 * The main control board is based on the ESP32, with the brushless motor driver chip being the L6234PD013TR. 
 * The encoder chip used is the AS5600, communicating with the main control board via the I2C interface.
 * The IMU used is the MPU6050 module, which shares the same I2C interface with the right-side encoder.
