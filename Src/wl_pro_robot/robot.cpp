@@ -126,6 +126,7 @@ double RobotProtocol::get_battery_level() {
   } else if (battery_percentage < 1) {
     battery_percentage = 1;
   }
+  battery_level = battery_percentage;
   return battery_percentage;
 }
 
@@ -184,18 +185,20 @@ void RobotProtocol::isSys(StaticJsonDocument<300> &doc) {
     // save data
     if (state == WIFI_STATE.SERVER || state == WIFI_STATE.CLIENT || state == WIFI_STATE.CLOSE) {
       eeprom_util.write(&EepromParam.ADDR_WIFI_STATE, state);
+      // read data
+      Serial.print("READ SAVE WIFI STATE:");
+      Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_STATE));
     }
-    eeprom_util.write(&EepromParam.ADDR_WIFI_SSID, ssid);
-    eeprom_util.write(&EepromParam.ADDR_WIFI_PASSWORD, password);
-
-    // read data
-    Serial.print("READ SAVE WIFI STATE:");
-    Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_STATE));
-    Serial.print("READ SAVE WIFI SSID:");
-    Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_SSID));
-    Serial.print("READ SAVE WIFI PASSWORD:");
-    Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_PASSWORD));
-
+    if(state == WIFI_STATE.CLIENT)
+    {
+      eeprom_util.write(&EepromParam.ADDR_WIFI_SSID, ssid);
+      eeprom_util.write(&EepromParam.ADDR_WIFI_PASSWORD, password);
+      // read data
+      Serial.print("READ SAVE WIFI SSID:");
+      Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_SSID));
+      Serial.print("READ SAVE WIFI PASSWORD:");
+      Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_PASSWORD));
+    }
   } else if (type == MESSAGE_TYPE.SYS_WEB_SOCKET_SERVER) {
     String host = doc["host"];
     uint16_t port = doc["port"];
@@ -230,6 +233,12 @@ void RobotProtocol::isSys(StaticJsonDocument<300> &doc) {
     if (doc["name"].isNull() == true) {
       Serial.println("Invalid json data.");
     }else{
+      String name_str = doc["name"];
+      if(name_str.length() > 20)
+      {
+        Serial.println("The name is too long. Please limit it to 20 characters or less.");
+        return;
+      }
       config_json[CONFIG_KEY.NAME] = doc["name"];
       save_config_json();
     }
@@ -245,9 +254,12 @@ void RobotProtocol::parseJson(StaticJsonDocument<300> &doc) {
 void RobotProtocol::get_dev_name(char dev_name[])
 {
   String name_str = config_json["name"];
-  name_str.toCharArray(dev_name,name_str.length());
+  unsigned int name_len = name_str.length()+1;
+  name_len = name_len>20 ? 20 : name_len;
+  name_str.toCharArray(dev_name,name_len);
   Serial.print("BLE name :");
   Serial.println(dev_name);
+  dev_name[19] = 0;
 }
 void build_dev_name(char dev_name[])
 {

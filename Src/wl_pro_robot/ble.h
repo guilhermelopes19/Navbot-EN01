@@ -1,6 +1,6 @@
 #pragma once
 
-#define BLE_DATA_SIZE 80
+#define BLE_DATA_SIZE 1024
 
 
 typedef struct CmdManeuverTypDef{
@@ -60,7 +60,7 @@ void ble_loop(void);
 void ble_test(void);
 
 void ble_send_string(const String &message);
-void ble_rx_add_string(String str);
+void ble_tx_add_string(String str);
 void ble_rx_add_data(char *data,int len);
 
 extern BleDataTypDef ble_rx,ble_tx;

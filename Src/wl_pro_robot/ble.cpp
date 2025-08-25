@@ -158,7 +158,7 @@ void ble_rx_processing(void) {
 }
 void ble_tx_processing(void) {
   
-  if (ble_tx.state == BLE_STATE_SEND_READY && deviceConnected == true) {
+  if (ble_tx.state == BLE_STATE_SEND_READY || ble_tx.state == BLE_STATE_SEND_BEING && deviceConnected == true) {
     // `ble_tx.index` is the index of the current data being sent.
     //If it is greater than or equal to the total length,
     //it indicates that the sending is complete or there is no data to be sent.
@@ -166,6 +166,13 @@ void ble_tx_processing(void) {
       ble_tx.state = BLE_STATE_SEND_FINISH;
       Serial.printf("finish!!!  ble_tx.index >= ble_tx.len  , ble_tx.index : %d , ble_tx.len : %d \r\n",ble_tx.index , ble_tx.len);
       return;
+    }
+    static int8_t time_lag = 10;
+    if(time_lag > 0){
+      time_lag --;
+      return;
+    }else{
+      time_lag = 10;
     }
 
     Serial.println("ble send frame");
@@ -175,12 +182,27 @@ void ble_tx_processing(void) {
     ble_tx.frame[1] = 0xAA;
     ble_tx.frame[2] = ble_tx.cmd;
     ble_tx.frame[3] = (ble_tx.len - ble_tx.index) / 15;
-    // ble_tx.frame[4] = (ble_tx.len) / 15 ;
+    ble_tx.frame[4] = 0;//(ble_tx.len) / 15 ;
+
+    // ble_tx.frame[0] = '-';
+    // ble_tx.frame[1] = '-';
+    // ble_tx.frame[2] = '-';
+    // ble_tx.frame[3] = '-';
+    // ble_tx.frame[4] = '-';
     memset(&ble_tx.frame[5], 0, 15);
 
     memcpy(&ble_tx.frame[5], &ble_tx.data[ble_tx.index], 15);
 
+    
     ble_send_data((uint8_t*)ble_tx.frame, 20);
+
+    uint8_t i;
+    for(i=0;i<20;i++)
+    {
+      Serial.printf("%02x ",ble_tx.frame[i]);
+    }
+    Serial.println("----");
+    
     ble_tx.index += 15;
   }
 }
@@ -335,18 +357,20 @@ void ble_cmd_restart_processing() {
 
 
 void ble_tx_add_data(char* data, int len) {
+  memset(ble_tx.data, 0, BLE_DATA_SIZE);
   memcpy(ble_tx.data, data, len);
   ble_tx.len   = len;
   ble_tx.index = 0 ;
   ble_tx.state = BLE_STATE_SEND_READY;
+
+  Serial.println("ble_tx_add_data:");
+  Serial.println((char*) ble_tx.data);
 }
-void ble_rx_add_string(String str) {
-  char buffer[300] = { 0 };
-  int len = str.length();
+void ble_tx_add_string(String str) {
+  char buffer[512] = { 0 };
+  int len = 1+str.length();
   str.toCharArray(buffer, len);
   ble_tx_add_data(buffer, len);
-  Serial.println("ble_tx_add_data:");
-  Serial.println(buffer);
 }
 
 

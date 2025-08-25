@@ -145,7 +145,7 @@ int jump_flag = 0;              //Jump period identification
 float leg_position_add = 0;     //roll axis balance control quantity
 
 //Voltage detection
-uint16_t bat_check_num = 0;
+
 static const adc1_channel_t channel = ADC1_CHANNEL_7;
 static const adc_bits_width_t width = ADC_WIDTH_BIT_12;
 static const adc_atten_t atten = ADC_ATTEN_DB_11;
@@ -592,6 +592,7 @@ void adc_calibration_init() {
 
 //Voltage detection
 void bat_check() {
+  static uint16_t bat_check_num = 9;
   if (bat_check_num > 10) {
     //Voltage reading
     uint32_t sum = 0;

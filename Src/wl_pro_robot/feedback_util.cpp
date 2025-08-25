@@ -20,7 +20,7 @@ String get_device_info() {
   // Serialize to string
   String jsonStr;
   // Create static JSON document (allocate memory pool size)
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<1024> doc;
 
   // Read voltage
   double battery_voltage = rp.get_battery_voltage();
@@ -37,10 +37,15 @@ String get_device_info() {
   degree_centigrade = round(degree_centigrade * 100) / 100;
 
   // Add simple values
+  doc["type"] = "get_device_info";
   doc["pcb_version"] = rp.pcb_version;
   doc["battery_level"] = rp.battery_level;
   doc["battery_voltage"] = rp.battery_voltage;
   doc["centigrade"] = rp.centigrade;
+  doc["name"]       = rp.config_json[CONFIG_KEY.NAME];
+
+  doc["cloud_token"]    = "Not yet implemented.";
+  doc["openAI_token"]   = "Not yet implemented.";
   // doc["status"] = rp.status;
 
   // doc["ESP32"] = "2.0.3";
@@ -65,9 +70,9 @@ void feedback_util_send_message(int send_channel = FEEDBACK_CHANNEL.BLE) {
   Serial.println(device_info);
   if (FEEDBACK_CHANNEL.ALL == send_channel) {
     web_sockets_client_send_message(device_info);
-    ble_rx_add_string(device_info);
+    ble_tx_add_string(device_info);
   } else if (FEEDBACK_CHANNEL.BLE == send_channel) {
-    ble_rx_add_string(device_info);
+    ble_tx_add_string(device_info);
   } else if (FEEDBACK_CHANNEL.WEB_SOCKET_CLIENT == send_channel) {
     web_sockets_client_send_message(device_info);
   }
