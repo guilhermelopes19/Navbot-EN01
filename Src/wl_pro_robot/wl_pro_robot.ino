@@ -1,10 +1,32 @@
-//Robot controlled header file
+// -----------------------------------------------------------------------------
+// Copyright (c) 2024 Mu Shibo
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+// -----------------------------------------------------------------------------
+
+//机器人控制头文件
 #include <MPU6050_tockn.h>
 #include "Servo_STS3032.h"
 #include <SimpleFOC.h>
 #include <Arduino.h>
 
-//WiFi transmission header file
+//wifi控制数据传输头文件
 #include <WebSocketsServer.h>
 #include <ArduinoJson.h>
 #include <WebServer.h>
@@ -14,116 +36,84 @@
 #include "robot.h"
 #include "wifi.h"
 #include "esp_adc_cal.h"
-#include "ble.h"
-#include "EEPROM.h"
-#include "eeprom_util.h"
-#include "feedback_util.h"
-#include "web_socket_client_util.h"
 
+/************实例定义*************/
 
-#include "cpu0_task.h"
-
-/************Instance definition*************/
-
-//Electromotor instance
+//电机实例
 BLDCMotor motor1 = BLDCMotor(7);
 BLDCMotor motor2 = BLDCMotor(7);
-BLDCDriver3PWM driver1 = BLDCDriver3PWM(32, 33, 25, 22);
-BLDCDriver3PWM driver2 = BLDCDriver3PWM(26, 27, 14, 12);
+BLDCDriver3PWM driver1 = BLDCDriver3PWM(32,33,25,22);
+BLDCDriver3PWM driver2  = BLDCDriver3PWM(26,27,14,12);
 
-//Encoder instance
+//编码器实例
 TwoWire I2Cone = TwoWire(0);
 TwoWire I2Ctwo = TwoWire(1);
 MagneticSensorI2C sensor1 = MagneticSensorI2C(AS5600_I2C);
 MagneticSensorI2C sensor2 = MagneticSensorI2C(AS5600_I2C);
 
-//PID instance
-PIDController pid_angle         { .P = 1, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_gyro          { .P = 0.06, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_distance      { .P = 0.5, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_speed         { .P = 0.7, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_yaw_angle     { .P = 1.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_yaw_gyro      { .P = 0.04, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_lqr_u         { .P = 1, .I = 15, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_zeropoint     { .P = 0.002, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
-PIDController pid_roll_angle    { .P = 8, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };
+//PID控制器实例
+PIDController pid_angle     {.P = 1,    .I = 0,   .D = 0, .ramp = 100000, .limit = 8};
+PIDController pid_gyro      {.P = 0.06, .I = 0,   .D = 0, .ramp = 100000, .limit = 8};
+PIDController pid_distance  {.P = 0.5,  .I = 0,   .D = 0, .ramp = 100000, .limit = 8};
+PIDController pid_speed     {.P = 0.7,  .I = 0,   .D = 0, .ramp = 100000, .limit = 8};
+PIDController pid_yaw_angle {.P = 1.0,  .I = 0,   .D = 0, .ramp = 100000, .limit = 8};
+PIDController pid_yaw_gyro  {.P = 0.04, .I = 0,   .D = 0, .ramp = 100000, .limit = 8};
+PIDController pid_lqr_u     {.P = 1,    .I = 15,  .D = 0, .ramp = 100000, .limit = 8};
+PIDController pid_zeropoint {.P = 0.002,.I = 0,   .D = 0, .ramp = 100000, .limit = 4};
+PIDController pid_roll_angle{.P = 8,    .I = 0,   .D = 0, .ramp = 100000, .limit = 450};
 
-//Low pass filter instance
-LowPassFilter lpf_joyy{ .Tf = 0.2 };
-LowPassFilter lpf_zeropoint{ .Tf = 0.1 };
-LowPassFilter lpf_roll{ .Tf = 0.3 };
+//低通滤波器实例
+LowPassFilter lpf_joyy{.Tf = 0.2};
+LowPassFilter lpf_zeropoint{.Tf = 0.1};
+LowPassFilter lpf_roll{.Tf = 0.3};
 
-// Commander communicate instance
+// commander通信实例
 Commander command = Commander(Serial);
 
-void StabAngle(char* cmd) {
-  command.pid(&pid_angle, cmd);
-}
-void StabGyro(char* cmd) {
-  command.pid(&pid_gyro, cmd);
-}
-void StabDistance(char* cmd) {
-  command.pid(&pid_distance, cmd);
-}
-void StabSpeed(char* cmd) {
-  command.pid(&pid_speed, cmd);
-}
-void StabYawAngle(char* cmd) {
-  command.pid(&pid_yaw_angle, cmd);
-}
-void StabYawGyro(char* cmd) {
-  command.pid(&pid_yaw_gyro, cmd);
-}
-void lpfJoyy(char* cmd) {
-  command.lpf(&lpf_joyy, cmd);
-}
-void StabLqrU(char* cmd) {
-  command.pid(&pid_lqr_u, cmd);
-}
-void StabZeropoint(char* cmd) {
-  command.pid(&pid_zeropoint, cmd);
-}
-void lpfZeropoint(char* cmd) {
-  command.lpf(&lpf_zeropoint, cmd);
-}
-void StabRollAngle(char* cmd) {
-  command.pid(&pid_roll_angle, cmd);
-}
-void lpfRoll(char* cmd) {
-  command.lpf(&lpf_roll, cmd);
-}
+void StabAngle(char* cmd)     { command.pid(&pid_angle, cmd);     }
+void StabGyro(char* cmd)      { command.pid(&pid_gyro, cmd);      }
+void StabDistance(char* cmd)  { command.pid(&pid_distance, cmd);  }
+void StabSpeed(char* cmd)     { command.pid(&pid_speed, cmd);     }
+void StabYawAngle(char* cmd)  { command.pid(&pid_yaw_angle, cmd); }
+void StabYawGyro(char* cmd)   { command.pid(&pid_yaw_gyro, cmd);  }
+void lpfJoyy(char* cmd)       { command.lpf(&lpf_joyy, cmd);      }
+void StabLqrU(char* cmd)      { command.pid(&pid_lqr_u, cmd);     }
+void StabZeropoint(char* cmd) { command.pid(&pid_zeropoint, cmd); }
+void lpfZeropoint(char* cmd)  { command.lpf(&lpf_zeropoint, cmd); }
+void StabRollAngle(char* cmd) { command.pid(&pid_roll_angle, cmd);}
+void lpfRoll(char* cmd)       { command.lpf(&lpf_roll, cmd);      }
 
-bool one_second_tick(void);
-bool ten_msec_tick(void);
 //void Stabtest_zeropoint(char* cmd) { command.pid(&test_zeropoint, cmd); }
 
-//WebServer instance
-WebServer webserver;                                // server
-WebSocketsServer websocket = WebSocketsServer(81);  // Define a webSocket server to process messages sent by clients
+//WebServer实例
+WebServer webserver; // server服务器
+WebSocketsServer websocket = WebSocketsServer(81); // 定义一个webSocket服务器来处理客户发送的消息
+RobotProtocol rp(20);
 int joystick_value[2];
 
-//MPU6050 instance
+//STS舵机实例
+SMS_STS sms_sts;
+
+//MPU6050实例
 MPU6050 mpu6050(I2Ctwo);
 
-/************parameter definition*************/
+/************参数定义*************/
 #define pi 3.1415927
 
-//LQR Self-balancing controller parameters
+//LQR自平衡控制器参数
 float LQR_angle = 0;
-float LQR_gyro = 0;
+float LQR_gyro  = 0;
 float LQR_speed = 0;
 float LQR_distance = 0;
-float angle_control = 0;
-float gyro_control = 0;
-float speed_control = 0;
+float angle_control   = 0;
+float gyro_control    = 0;
+float speed_control   = 0;
 float distance_control = 0;
 float LQR_u = 0;
-float angle_zeropoint = 4.02;
-float distance_zeropoint = -256.0;  //Wheel position shift zero offset \
- (-256 is an impossible displacement value, use it as a sign that it is not refreshed)
+float angle_zeropoint = -2.25;
+float distance_zeropoint = -256.0;       //轮部位移零点偏置（-256为一个不可能的位移值，将其作为未刷新的标志）
 
-
-//YAW axis control data
+//YAW轴控制数据
 float YAW_gyro = 0;
 float YAW_angle = 0;
 float YAW_angle_last = 0;
@@ -131,124 +121,84 @@ float YAW_angle_total = 0;
 float YAW_angle_zero_point = -10;
 float YAW_output = 0;
 
-//Leg steering gear control data
+//腿部舵机控制数据
 byte ID[2];
 s16 Position[2];
 u16 Speed[2];
 byte ACC[2];
 
-//Logical processing flag bit
-float robot_speed = 0;          //Record the current wheel speed
-float robot_speed_last = 0;     //Record the wheel speed at the previous time
-int wrobot_move_stop_flag = 0;  //Record the sign that the rocker stops
-int jump_flag = 0;              //Jump period identification
-float leg_position_add = 0;     //roll axis balance control quantity
+//逻辑处理标志位
+float robot_speed = 0;          //记录当前轮部转速
+float robot_speed_last = 0;     //记录上一时刻的轮部转速
+int wrobot_move_stop_flag = 0;  //记录摇杆停止的标识
+int jump_flag = 0;              //跳跃时段标识
+float leg_position_add = 0;     //roll轴平衡控制量
+int uncontrolable = 0;          //机身倾角过大导致失控
 
-//Voltage detection
+//电压检测
 uint16_t bat_check_num = 0;
-static const adc1_channel_t channel = ADC1_CHANNEL_7;
+int BAT_PIN = 35;    // select the input pin for the ADC
+static esp_adc_cal_characteristics_t adc_chars;
+static const adc1_channel_t channel = ADC1_CHANNEL_7;     
 static const adc_bits_width_t width = ADC_WIDTH_BIT_12;
 static const adc_atten_t atten = ADC_ATTEN_DB_11;
 static const adc_unit_t unit = ADC_UNIT_1;
 
-//Power display LED Pin
+//电量显示LED
 #define LED_BAT 13
 
-void user_function(char* cmd) {
-  switch(*cmd)
-  {
-    case '1':
-    {
-      Serial.println("off all servo");
-      sms_sts.off_all_servo();
-    }break;
-    case '2':
-    {
-      Serial.println("on all servo");
-      sms_sts.on_all_servo();
-    }break;
-    case '3':
-    {
-      Serial.println("calibrate all servo");
-      sms_sts.calibrate_all_servo();
-    }break;
-    // case '4':
-    // {
-    //   Serial.println("set servo id 2");
-    //   sms_sts.set_servo_id(1,2);
-    // }break;
-    // case '5':
-    // {
-    //   Serial.println("set servo id 1");
-    //   sms_sts.set_servo_id(2,1);
-    // }break;
-
-  }
-}
-
 void setup() {
+  Serial.begin(115200);//通讯串口
+  Serial2.begin(1000000);//腿部sts舵机
 
-  // ble_test();
+  //Wifi初始化
+  WiFi_SetAP();
+  // set_sta_wifi();      // ESP-01S STA模式接入WiFi网络
+  webserver.begin();
+  webserver.on("/", HTTP_GET, basicWebCallback);
+  websocket.begin();
+  websocket.onEvent(webSocketEventCallback);
 
-  // delay(3000);
-  Serial.begin(115200);
-  Serial2.begin(1000000);
-  rp.get_pcb_version();
-  xTaskCreatePinnedToCore(cpu0_task, "cpu0_task", 1024 * 4, NULL, 0, NULL, 0);
-
-  ble_init();
-  wifi_init();
-
-  if (get_wifi_state() != WIFI_STATE.CLOSE) {
-    webserver.begin();
-    webserver.on("/", HTTP_GET, basicWebCallback);
-    websocket.begin();
-    websocket.onEvent(webSocketEventCallback);
-  }
-
-  web_sockets_client_init();
-
-  //Steering gear initialization
-  //Steering gear effective stroke 450
-  //Left-hand steering gear[2048+12+50,2048+12+450]
-  //Right-hand steering gear[2048-12-50,2048-12-450]
+  //舵机初始化
+  //舵机有效行程450
+  //左侧舵机[2048+12+50,2048+12+450]
+  //左侧舵机[2048-12-50,2048-12-450]
   sms_sts.pSerial = &Serial2;
   ID[0] = 1;
   ID[1] = 2;
   ACC[0] = 30;
   ACC[1] = 30;
   Speed[0] = 300;
-  Speed[1] = 300;
-  Position[0] =2048;
-  Position[1] =2048;
-  //The steering gear (ID1/ID2) runs to their respective positions at maximum speed V=2400 steps/SEC and \
-  acceleration A=50(50*100 steps/SEC ^2)
+  Speed[1] = 300;  
+  Position[0] = 2148;
+  Position[1] = 1948;
+  //舵机(ID1/ID2)以最高速度V=2400步/秒，加速度A=50(50*100步/秒^2)，运行至各自的Position位置
   sms_sts.SyncWritePosEx(ID, 2, Position, Speed, ACC);
 
-  //Voltage detection
+  //电压检测
   adc_calibration_init();
   adc1_config_width(width);
   adc1_config_channel_atten(channel, atten);
   esp_adc_cal_characterize(unit, atten, width, 0, &adc_chars);
 
-  //Voltage detection LED
-  pinMode(LED_BAT, OUTPUT);
-
-  // Encoder setup
-  I2Cone.begin(19, 18, 400000UL);
-  I2Ctwo.begin(23, 5, 400000UL);
+  //电量显示LED
+  pinMode(LED_BAT,OUTPUT);
+  
+  // 编码器设置
+  I2Cone.begin(19,18, 400000UL); 
+  I2Ctwo.begin(23,5, 400000UL); 
   sensor1.init(&I2Cone);
   sensor2.init(&I2Ctwo);
 
-  //mpu6050 setup
+  //mpu6050设置
   mpu6050.begin();
   mpu6050.calcGyroOffsets(true);
-
-  //Connect the motor object to the encoder object
+  
+  //连接motor对象与编码器对象
   motor1.linkSensor(&sensor1);
   motor2.linkSensor(&sensor2);
 
-  //Speed loop PID parameter
+  //速度环PID参数
   motor1.PID_velocity.P = 0.05;
   motor1.PID_velocity.I = 1;
   motor1.PID_velocity.D = 0;
@@ -257,7 +207,7 @@ void setup() {
   motor2.PID_velocity.I = 1;
   motor2.PID_velocity.D = 0;
 
-  // Motor driver setup
+  // 驱动器设置
   motor1.voltage_sensor_align = 6;
   motor2.voltage_sensor_align = 6;
   driver1.voltage_power_supply = 8;
@@ -265,40 +215,39 @@ void setup() {
   driver1.init();
   driver2.init();
 
-  //Connect the motor object to the drive object
+  //连接motor对象与驱动器对象
   motor1.linkDriver(&driver1);
   motor2.linkDriver(&driver2);
 
   motor1.torque_controller = TorqueControlType::voltage;
-  motor2.torque_controller = TorqueControlType::voltage;
+  motor2.torque_controller = TorqueControlType::voltage;   
   motor1.controller = MotionControlType::torque;
   motor2.controller = MotionControlType::torque;
-
-  // Motor-related Settings
+  
+  // monitor相关设置
   motor1.useMonitoring(Serial);
   motor2.useMonitoring(Serial);
-  //init
+  //电机初始化
   motor1.init();
-  motor1.initFOC();
+  motor1.initFOC(); 
   motor2.init();
   motor2.initFOC();
 
-  // Map motor to commander
-  command.add('A', StabAngle, "pid angle");
-  command.add('B', StabGyro, "pid gyro");
-  command.add('C', StabDistance, "pid distance");
-  command.add('D', StabSpeed, "pid speed");
-  command.add('E', StabYawAngle, "pid yaw angle");
-  command.add('F', StabYawGyro, "pid yaw gyro");
-  command.add('G', lpfJoyy, "lpf joyy");
-  command.add('H', StabLqrU, "pid lqr u");
-  command.add('I', StabZeropoint, "pid zeropoint");
-  command.add('J', lpfZeropoint, "lpf zeropoint");
-  command.add('K', StabRollAngle, "pid roll angle");
-  command.add('L', lpfRoll, "lpf roll");
-  command.add('U', user_function, "user function");
+  // 映射电机到commander
+    command.add('A', StabAngle, "pid angle");
+    command.add('B', StabGyro, "pid gyro");
+    command.add('C', StabDistance, "pid distance");
+    command.add('D', StabSpeed, "pid speed");
+    command.add('E', StabYawAngle, "pid yaw angle");
+    command.add('F', StabYawGyro, "pid yaw gyro");
+    command.add('G', lpfJoyy, "lpf joyy");
+    command.add('H', StabLqrU, "pid lqr u");
+    command.add('I', StabZeropoint, "pid zeropoint");
+    command.add('J', lpfZeropoint, "lpf zeropoint");
+    command.add('K', StabRollAngle, "pid roll angle");
+    command.add('L', lpfRoll, "lpf roll");
 
-  //command.add('M', Stabtest_zeropoint, "test_zeropoint");
+    //command.add('M', Stabtest_zeropoint, "test_zeropoint");
 
 
 
@@ -306,364 +255,315 @@ void setup() {
 }
 
 void loop() {
-
-  if (one_second_tick()) {
-    bat_check();  //Voltage detection
-    wifi_loop();
-  }
-  if(ten_msec_tick()){
-    ble_loop();
-  }
-
-  web_loop();  //Web data update
+  bat_check();        //电压检测
+  web_loop();         //Web数据更新
+  mpu6050.update();   //IMU数据更新
+  lqr_balance_loop(); //lqr自平衡控制
+  yaw_loop();         //yaw轴转向控制
+  leg_loop();         //腿部动作控制
   
-  mpu6050.update();    //IMU data update
-  lqr_balance_loop();  //lqr self-balancing control
-  yaw_loop();          //yaw axis steering control
-  leg_loop();          //Leg motion control
+  //将自平衡计算输出转矩赋给电机
+  motor1.target = (-0.5)*(LQR_u + YAW_output);
+  motor2.target = (-0.5)*(LQR_u - YAW_output);
 
-  //The self-balancing calculated output torque is assigned to the motor
-  motor1.target = (-0.5) * (LQR_u + YAW_output);
-  motor2.target = (-0.5) * (LQR_u - YAW_output);
-
-  //Shut down output after falling out of control
-  if (abs(LQR_angle) > 25.0f) {
+  //倒地失控后关闭输出
+  if( abs(LQR_angle) > 25.0f  )
+  {
     uncontrolable = 1;
   }
-  if (uncontrolable != 0)  //Delay recovery after lifting
+  if( uncontrolable != 0 )//扶起后延时恢复
   {
-    if (abs(LQR_angle) < 10.0f) {
+    if( abs(LQR_angle) < 10.0f  )
+    {
       uncontrolable++;
     }
-    if (uncontrolable > 200)  //The delay time of 200 program cycles
+    if( uncontrolable > 200 )//200次程序循环的延时时间
     {
       uncontrolable = 0;
     }
   }
-
-  //Turn off output (remote control stop or Angle is too large out of control)
-  if (wrobot.go == 0 || uncontrolable != 0) {
+  
+  //关停输出（遥控停止或角度过大失控）
+  if(wrobot.go==0 || uncontrolable!=0)
+  {
     motor1.target = 0;
     motor2.target = 0;
     leg_position_add = 0;
   }
-
-  //Record the last remote control data
-  wrobot.dir_last = wrobot.dir;
+  
+  //记录上一次的遥控数据数据
+  wrobot.dir_last  = wrobot.dir;
   wrobot.joyx_last = wrobot.joyx;
   wrobot.joyy_last = wrobot.joyy;
-
-  //The FOC phase voltage is computed iteratively
+  
+  //迭代计算FOC相电压
   motor1.loopFOC();
   motor2.loopFOC();
-
-  //Set the wheel motor output
+  
+  //设置轮部电机输出
   motor1.move();
   motor2.move();
-
+  
   command.run();
-}
-
-//lqr self-balancing control
-void lqr_balance_loop() {
-  /*
-  * LQR balance formula, in order to facilitate the adjustment of parameters in actual use, 
-  * the formula is decomposed into 4 P controls, 
-  * using the PIDController method in commander real-time debugging
-  */
-  //QR_u = LQR_k1*(LQR_angle - angle_zeropoint) + LQR_k2*LQR_gyro + LQR_k3*(LQR_distance - distance_zeropoint) + LQR_k4*LQR_speed;
-
-  //The negative value is given because, according to the current motor wiring, the positive torque will turn backwards
-  LQR_distance = (-0.5) * (motor1.shaft_angle + motor2.shaft_angle);
-  LQR_speed = (-0.5) * (motor1.shaft_velocity + motor2.shaft_velocity);
-  LQR_angle = (float)mpu6050.getAngleY();
-  LQR_gyro = (float)mpu6050.getGyroY();
-  //Serial.println(LQR_distance);
-  // Serial.println(LQR_angle);
-  // Serial.print("-->");
-  // Serial.println(angle_control);
-  //Calculate self-balancing output
-  angle_control = pid_angle(LQR_angle - angle_zeropoint);
-  gyro_control = pid_gyro(LQR_gyro);
-
-  //Motion detail optimization processing
-  if (wrobot.joyy != 0)  //Handling when there are forward and backward direction motion instructions
-  {
-    distance_zeropoint = LQR_distance;  //Displacement zero reset
-    pid_lqr_u.error_prev = 0;           //The output integral is cleared to zero
   }
 
-  if ((wrobot.joyx_last != 0 && wrobot.joyx == 0) || (wrobot.joyy_last != 0 && wrobot.joyy == 0))  //Stop in place processing when motion instruction returns to zero
+//lqr自平衡控制
+void lqr_balance_loop(){
+  //LQR平衡算式，实际使用中为便于调参，讲算式分解为4个P控制，采用PIDController方法在commander中实时调试
+  //QR_u = LQR_k1*(LQR_angle - angle_zeropoint) + LQR_k2*LQR_gyro + LQR_k3*(LQR_distance - distance_zeropoint) + LQR_k4*LQR_speed;
+
+  //给负值是因为按照当前的电机接线，正转矩会向后转
+  LQR_distance  = (-0.5) *(motor1.shaft_angle + motor2.shaft_angle);
+  LQR_speed     = (-0.5) *(motor1.shaft_velocity + motor2.shaft_velocity);
+  LQR_angle = (float)mpu6050.getAngleY();
+  LQR_gyro  = (float)mpu6050.getGyroY(); 
+  //Serial.println(LQR_distance); 
+
+  //计算自平衡输出
+  angle_control     = pid_angle(LQR_angle - angle_zeropoint);
+  gyro_control      = pid_gyro(LQR_gyro);
+
+  //运动细节优化处理
+  if(wrobot.joyy != 0)//有前后方向运动指令时的处理
+  {
+    distance_zeropoint = LQR_distance;//位移零点重置
+    pid_lqr_u.error_prev = 0;         //输出积分清零
+  }
+
+  if( (wrobot.joyx_last!=0 && wrobot.joyx==0) || (wrobot.joyy_last!=0 && wrobot.joyy==0) )//运动指令复零时的原地停车处理
   {
     wrobot_move_stop_flag = 1;
   }
-  if ((wrobot_move_stop_flag == 1) && (abs(LQR_speed) < 0.5)) {
-    distance_zeropoint = LQR_distance;  //Displacement zero reset
+  if( (wrobot_move_stop_flag==1) && (abs(LQR_speed)<0.5) )
+  {
+    distance_zeropoint = LQR_distance;//位移零点重置
     wrobot_move_stop_flag = 0;
   }
 
-  if (abs(LQR_speed) > 15)  //Stop in place treatment when being pushed rapidly
+  if( abs(LQR_speed)>15 )//被快速推动时的原地停车处理
   {
-    distance_zeropoint = LQR_distance;  //Displacement zero reset
+    distance_zeropoint = LQR_distance;//位移零点重置
   }
 
-  //Calculate displacement control output
-  distance_control = pid_distance(LQR_distance - distance_zeropoint);
-  speed_control = pid_speed(LQR_speed - 0.1 * lpf_joyy(wrobot.joyy));
+  //计算位移控制输出
+  distance_control  = pid_distance(LQR_distance - distance_zeropoint);
+  speed_control     = pid_speed(LQR_speed- 0.1*lpf_joyy(wrobot.joyy) );
 
-  //Wheel lift detection
-  robot_speed_last = robot_speed;  //Record two consecutive wheel speeds
+  //轮部离地检测
+  robot_speed_last = robot_speed; //记录连续两次的轮部转速
   robot_speed = LQR_speed;
-  if (abs(robot_speed - robot_speed_last) > 10 || abs(robot_speed) > 50 || (jump_flag != 0)) /*If the angular speed and angular acceleration of the 
-                                                    wheel are too large or in the recovery period after jumping, 
-                                                    it is considered that the wheel is off the 
-                                                    ground and needs special treatment.
-                                                  */
+  if( abs(robot_speed-robot_speed_last) > 10 || abs(robot_speed) > 50 || (jump_flag != 0))  //若轮部角速度、角加速度过大或处于跳跃后的恢复时期，认为出现轮部离地现象，需要特殊处理
   {
-    distance_zeropoint = LQR_distance;     //Displacement zero point reset
-    LQR_u = angle_control + gyro_control;  //When the wheel part is off the ground, \
-                                          the quantity of the opposite wheel part is not output.\
-                                          Conversely, under normal conditions, the balanced torque is fully output
-    pid_lqr_u.error_prev = 0;              //The output integral is reset to zero
-  } else {
-    LQR_u = angle_control + gyro_control + distance_control + speed_control;
+    distance_zeropoint = LQR_distance;    //位移零点重置
+    LQR_u = angle_control + gyro_control; //轮部离地情况下，对轮部分量不输出；反之，正常状态下完整输出平衡转矩
+    pid_lqr_u.error_prev = 0; //输出积分清零
   }
-
-  //Trigger conditions: No signal input from the remote control, \
-    normal intervention of the wheel position movement control, \
-    and not in the recovery period after jumping
-  if (abs(LQR_u) < 5 && wrobot.joyy == 0 && abs(distance_control) < 4 && (jump_flag == 0)) {
-
-    LQR_u = pid_lqr_u(LQR_u);  //Compensate for the nonlinearity of small torque
+  else
+  {
+    LQR_u = angle_control + gyro_control + distance_control + speed_control; 
+  }
+  
+  //触发条件：遥控器无信号输入、轮部位移控制正常介入、不处于跳跃后的恢复时期
+  if( abs(LQR_u)<5 && wrobot.joyy == 0 && abs(distance_control)<4 && (jump_flag == 0))
+  {
+    
+    LQR_u = pid_lqr_u(LQR_u);//补偿小转矩非线性
     //Serial.println(LQR_u);
-    angle_zeropoint -= pid_zeropoint(lpf_zeropoint(distance_control));  //Center of gravity adaptive
-  } else {
-    pid_lqr_u.error_prev = 0;  //The output integral is reset to zero
+    angle_zeropoint -= pid_zeropoint(lpf_zeropoint(distance_control));//重心自适应
+  }
+  else
+  {
+    pid_lqr_u.error_prev = 0; //输出积分清零
   }
 
-  //The balance control parameters are adaptive
-  if (wrobot.height < 50) {
+  //平衡控制参数自适应
+  if(wrobot.height < 50)
+  {
     pid_speed.P = 0.7;
-  } else if (wrobot.height < 64) {
+  }
+  else if(wrobot.height < 64)
+  {
     pid_speed.P = 0.6;
-  } else {
+  }
+  else
+  {
     pid_speed.P = 0.5;
   }
 }
 
-//Leg movement control
-void leg_loop() {
+//腿部动作控制
+void leg_loop(){
   jump_loop();
-  if (jump_flag == 0)  //Not in a jumping state
+  if(jump_flag == 0)//不处于跳跃状态
   {
-    //Adaptive control of the body height
-    ACC[0] = 5;
-    ACC[1] = 5;
-    Speed[0] = 150;
-    Speed[1] = 150;
-    float roll_angle = (float)mpu6050.getAngleX() + 2.0 + rp.offset_roll;
-    // leg_position_add += pid_roll_angle(roll_angle);
-    leg_position_add = pid_roll_angle(lpf_roll(roll_angle));  //test
-    Position[0] = 2048  + 8.4 * (wrobot.height - 32) - leg_position_add;
-    Position[1] = 2048  - 8.4 * (wrobot.height - 32) - leg_position_add;
-    if (Position[0] < 2110)
-      Position[0] = 2110;
-    else if (Position[0] > 2510)
-      Position[0] = 2510;
-    if (Position[1] < 1586)
-      Position[1] = 1586;
-    else if (Position[1] > 1986)
-      Position[1] = 1986;
+    //机身高度自适应控制
+    ACC[0] = 8;
+    ACC[1] = 8;
+    Speed[0] = 200;
+    Speed[1] = 200;
+    float roll_angle  = (float)mpu6050.getAngleX() + 2.0;
+    //leg_position_add += pid_roll_angle(roll_angle);
+    leg_position_add = pid_roll_angle(lpf_roll(roll_angle));//test
+    Position[0] = 2048 + 12 + 8.4*(wrobot.height-32) - leg_position_add;
+    Position[1] = 2048 - 12 - 8.4*(wrobot.height-32) - leg_position_add;
+    if( Position[0]<2110 )
+      Position[0]=2110;
+    else if( Position[0]>2510 )
+      Position[0]=2510;
+    if( Position[1]<1586 )
+      Position[1]=1586;
+    else if( Position[1]>1986 )
+      Position[1]=1986;
     sms_sts.SyncWritePosEx(ID, 2, Position, Speed, ACC);
-  }
+  }  
 }
 
-//Jump control
-void jump_loop() {
-  if ((wrobot.dir_last == STOP) && (wrobot.dir == JUMP) && (jump_flag == 0)) {
-    ACC[0] = 0;
-    ACC[1] = 0;
-    Speed[0] = 0;
-    Speed[1] = 0;
-    Position[0] = 2048 + 12 + 8.4 * (80 - 32);
-    Position[1] = 2048 - 12 - 8.4 * (80 - 32);
-    sms_sts.SyncWritePosEx(ID, 2, Position, Speed, ACC);
-
-    jump_flag = 1;
-  }
-  if (jump_flag > 0) {
-    jump_flag++;
-    if ((jump_flag > 30) && (jump_flag < 35)) {
+//跳跃控制
+void jump_loop(){
+  if( (wrobot.dir_last == 5) && (wrobot.dir == 4) && (jump_flag == 0) )
+  {
       ACC[0] = 0;
       ACC[1] = 0;
       Speed[0] = 0;
       Speed[1] = 0;
-      Position[0] = 2048 + 12 + 8.4 * (40 - 32);
-      Position[1] = 2048 - 12 - 8.4 * (40 - 32);
+      Position[0] = 2048 + 12 + 8.4*(80-32);
+      Position[1] = 2048 - 12 - 8.4*(80-32);
+      sms_sts.SyncWritePosEx(ID, 2, Position, Speed, ACC);
+
+      jump_flag = 1;
+  }
+  if( jump_flag > 0 )
+  {
+    jump_flag++;
+    if( (jump_flag > 30) && (jump_flag < 35) )
+    {
+      ACC[0] = 0;
+      ACC[1] = 0;
+      Speed[0] = 0;
+      Speed[1] = 0;
+      Position[0] = 2048 + 12 + 8.4*(40-32);
+      Position[1] = 2048 - 12 - 8.4*(40-32);
       sms_sts.SyncWritePosEx(ID, 2, Position, Speed, ACC);
 
       jump_flag = 40;
     }
-    if (jump_flag > 200) {
-      jump_flag = 0;  //Ready to jump again
+    if(jump_flag > 200)
+    {
+      jump_flag = 0;//已准备好再次跳跃
     }
   }
 }
 
-//yaw axis steering control
-void yaw_loop() {
+//yaw轴转向控制
+void yaw_loop(){
   //YAW_output = 0.03*(YAW_Kp*YAW_angle_total + YAW_Kd*YAW_gyro);
   yaw_angle_addup();
-
-  YAW_angle_total += wrobot.joyx * 0.002;
+  
+  YAW_angle_total += wrobot.joyx*0.002;
   float yaw_angle_control = pid_yaw_angle(YAW_angle_total);
-  float yaw_gyro_control = pid_yaw_gyro(YAW_gyro);
-  YAW_output = yaw_angle_control + yaw_gyro_control;
+  float yaw_gyro_control  = pid_yaw_gyro(YAW_gyro);
+  YAW_output = yaw_angle_control + yaw_gyro_control;  
 }
 
-//Web Data Update
-void web_loop() {
+//Web数据更新
+void web_loop(){
   webserver.handleClient();
   websocket.loop();
-  web_sockets_client_loop();  // The websocket client continuously makes requests.
-  rp.spinOnce();              //Update the control information returned by the web end
+  rp.spinOnce();//更新web端回传的控制信息
 }
 
-//The yaw axis Angle accumulation function
+//yaw轴角度累加函数
 void yaw_angle_addup() {
-  YAW_angle = (float)mpu6050.getAngleZ();
-  ;
-  YAW_gyro = (float)mpu6050.getGyroZ();
+  YAW_angle  = (float)mpu6050.getAngleZ();;
+  YAW_gyro   = (float)mpu6050.getGyroZ();
 
-  if (YAW_angle_zero_point == (-10)) {
+  if(YAW_angle_zero_point == (-10))
+  {
     YAW_angle_zero_point = YAW_angle;
   }
 
-  float yaw_angle_1, yaw_angle_2, yaw_addup_angle;
-  if (YAW_angle > YAW_angle_last) {
+  float yaw_angle_1,yaw_angle_2,yaw_addup_angle;
+  if(YAW_angle > YAW_angle_last)
+  {
     yaw_angle_1 = YAW_angle - YAW_angle_last;
-    yaw_angle_2 = YAW_angle - YAW_angle_last - 2 * PI;
-  } else {
+    yaw_angle_2 = YAW_angle - YAW_angle_last - 2*PI;
+  }
+  else
+  {
     yaw_angle_1 = YAW_angle - YAW_angle_last;
-    yaw_angle_2 = YAW_angle - YAW_angle_last + 2 * PI;
+    yaw_angle_2 = YAW_angle - YAW_angle_last + 2*PI;
   }
 
-  if (abs(yaw_angle_1) > abs(yaw_angle_2)) {
-    yaw_addup_angle = yaw_angle_2;
-  } else {
-    yaw_addup_angle = yaw_angle_1;
+  if(abs(yaw_angle_1)>abs(yaw_angle_2))
+  {
+    yaw_addup_angle=yaw_angle_2;
+  }
+  else
+  {
+    yaw_addup_angle=yaw_angle_1;
   }
 
   YAW_angle_total = YAW_angle_total + yaw_addup_angle;
   YAW_angle_last = YAW_angle;
 }
 
-void basicWebCallback(void) {
+void basicWebCallback(void)
+{
   webserver.send(300, "text/html", basic_web);
 }
 
-void webSocketEventCallback(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
-  if (type == WStype_TEXT) {
-    String payload_str = String((char*)payload);
-    StaticJsonDocument<300> doc;
+void webSocketEventCallback(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
+{
+  if(type == WStype_TEXT)
+  {
+    String payload_str = String((char*) payload);   
+    StaticJsonDocument<300> doc;  
     DeserializationError error = deserializeJson(doc, payload_str);
 
     String mode_str = doc["mode"];
-    if (mode_str == "basic") {
+    if(mode_str == "basic")
+    {
       rp.parseBasic(doc);
     }
   }
 }
 
-void webSocketClientEventCallback(WStype_t type, uint8_t* payload, size_t length) {
-  switch (type) {
-    case WStype_DISCONNECTED:
-      printf("WEB SOCKET CLIENT:DISCONNECTED\n");
-      break;
-
-    case WStype_CONNECTED:
-      printf("WEB SOCKET CLIENT:CONNECTED\n");
-      break;
-  }
-
-  if (type == WStype_TEXT) {
-    String payload_str = String((char*)payload);
-    StaticJsonDocument<300> doc;
-    DeserializationError error = deserializeJson(doc, payload_str);
-
-    printf("eFuse Two Point: Supported\n");
-    String mode_str = doc["mode"];
-    if (mode_str == "basic") {
-      rp.parseBasic(doc);
+//电压检测初始化
+void adc_calibration_init()
+{
+    if (esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_TP) == ESP_OK) {
+        printf("eFuse Two Point: Supported\n");
+    } else {
+        printf("eFuse Two Point: NOT supported\n");
     }
-  }
+    //Check Vref is burned into eFuse
+    if (esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_VREF) == ESP_OK) {
+        printf("eFuse Vref: Supported\n");
+    } else {
+        printf("eFuse Vref: NOT supported\n");
+    }
 }
 
-//Voltage detection initialization
-void adc_calibration_init() {
-  if (esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_TP) == ESP_OK) {
-    printf("eFuse Two Point: Supported\n");
-  } else {
-    printf("eFuse Two Point: NOT supported\n");
-  }
-  //Check Vref is burned into eFuse
-  if (esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_VREF) == ESP_OK) {
-    printf("eFuse Vref: Supported\n");
-  } else {
-    printf("eFuse Vref: NOT supported\n");
-  }
-}
-
-//Voltage detection
-void bat_check() {
-  if (bat_check_num > 10) {
-    //Voltage reading
+//电压检测
+void bat_check()
+{
+  if(bat_check_num > 1000)
+  {
+    //电压读取
     uint32_t sum = 0;
-    sum = analogRead(BAT_PIN);
+    sum= analogRead(BAT_PIN);
     uint32_t voltage = esp_adc_cal_raw_to_voltage(sum, &adc_chars);
-    rp.battery_voltage = (voltage * 4) / 1000.0;
+    double battery=(voltage*3.97)/1000.0;
 
-    Serial.println(rp.battery_voltage);
-    //Battery display
-    if (rp.battery_voltage > 7.8)
-      digitalWrite(LED_BAT, HIGH);
+    Serial.println(battery);
+    //电量显示
+    if(battery>7.8)
+      digitalWrite(LED_BAT,HIGH);
     else
-      digitalWrite(LED_BAT, LOW);
+      digitalWrite(LED_BAT,LOW);
 
     bat_check_num = 0;
-  } else
+  }
+  else
     bat_check_num++;
-}
-
-//Generate a one-second tick
-bool one_second_tick(void) {
-  static unsigned long lastMillis = 0;
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - lastMillis >= 5000) {
-    lastMillis = currentMillis;
-    return 1;
-  }
-  //Overflow handling
-  if (lastMillis > currentMillis) {
-    lastMillis = currentMillis;
-  }
-
-  return 0;
-}
-//milliseconds
-bool ten_msec_tick(void) {
-  static unsigned long lastMillis = 0;
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - lastMillis >= 10) {
-    lastMillis = currentMillis;
-    return 1;
-  }
-  //Overflow handling
-  if (lastMillis > currentMillis) {
-    lastMillis = currentMillis;
-  }
-
-  return 0;
 }
