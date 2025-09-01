@@ -19,7 +19,7 @@ IPAddress AP_SUBNET(255, 255, 255, 0);
 char wifi_mode;
 
 // ESP-01S access the WiFi network in AP mode
-void wifi_set_sta()
+void wifi_set_sta()  
 {
   //Read the wifi information
   eeprom_util.read(& EepromParam.ADDR_WIFI_SSID,wifi_ssid);
