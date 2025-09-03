@@ -1,4 +1,5 @@
 #include "feedback_util.h"
+#include "robot.h"
 
 
 static String get_dev_mac() {
@@ -42,10 +43,12 @@ String get_device_info() {
   doc["battery_level"] = rp.battery_level;
   doc["battery_voltage"] = rp.battery_voltage;
   doc["centigrade"] = rp.centigrade;
-  doc["name"]       = rp.config_json[CONFIG_KEY.NAME];
-
-  doc["cloud_token"]    = "Not yet implemented.";
-  doc["openAI_token"]   = "Not yet implemented.";
+  doc["name"] = rp.config_json[CONFIG_KEY.NAME];
+  doc["charge"] = rp.charge;
+  doc["IP"] = WiFi.localIP();
+  // rp.get_expression_name(doc);
+  doc["cloud_token"] = rp.config_json[CONFIG_KEY.CLOUD_TOKEN];
+  doc["openAI_token"] = rp.config_json[CONFIG_KEY.OPENAI_TOKEN];
   // doc["status"] = rp.status;
 
   // doc["ESP32"] = "2.0.3";

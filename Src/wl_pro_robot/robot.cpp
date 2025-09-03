@@ -5,6 +5,8 @@
 #include "eeprom_util.h"
 #include "Servo_STS3032.h"
 #include "SPIFFS.h"
+#include <vector>
+#include "cpu0_task.h"
 
 int uncontrolable = 0;
 int BAT_PIN = 35;
@@ -83,9 +85,9 @@ extern "C" {
   uint8_t temprature_sens_read();
 }
 
-double RobotProtocol::get_pcb_version(){
+double RobotProtocol::get_pcb_version() {
   int sensorValue = analogRead(A0);
-  pcb_version = sensorValue * (3.30 / 4096) +1;
+  pcb_version = sensorValue * (3.30 / 4096) + 1;
   Serial.print("pcb_version:");
   Serial.println(pcb_version);
   return pcb_version;
@@ -111,7 +113,7 @@ double RobotProtocol::get_battery_level() {
   double minVoltage = 7.0;
 
   // Ensure the voltage is within a reasonable range
-  
+
   if (currentVoltage >= maxVoltage) return 100.0;
   if (currentVoltage <= minVoltage) return 0.0;
 
@@ -121,7 +123,7 @@ double RobotProtocol::get_battery_level() {
   battery_percentage = round(battery_percentage) / 1;  // Format to retain two significant digits (rounded to 2 decimal places)
 
   // Battery logic correction (prevent out-of-bounds and display of 0 data)
-  if (battery_percentage > 100) { 
+  if (battery_percentage > 100) {
     battery_percentage = 100;
   } else if (battery_percentage < 1) {
     battery_percentage = 1;
@@ -143,13 +145,14 @@ int RobotProtocol::get_robot_status() {
   return robot_status;
 }
 
+
 void RobotProtocol::printDoc(StaticJsonDocument<300> &doc) {
   char receive_command[300];
   serializeJson(doc, receive_command);
   Serial.printf("receive_command:%s \r\n", receive_command);
 }
- 
-bool create_and_write_file(const char* filePath, const char* content) {
+
+bool create_and_write_file(const char *filePath, const char *content) {
   // Open the file in write mode (if the file does not exist, it will be created)
   File file = SPIFFS.open(filePath, FILE_WRITE);
   // Write the content to the file
@@ -163,106 +166,254 @@ bool create_and_write_file(const char* filePath, const char* content) {
     return false;
   }
 }
-void RobotProtocol::save_config_json(void)
-{
+void RobotProtocol::save_config_json(void) {
   Serial.print("save config json :");
   printDoc(config_json);
-  char json_arr[CONFIG_JSON_SIZE+1] = {0};
+  char json_arr[CONFIG_JSON_SIZE + 1] = { 0 };
   serializeJson(rp.config_json, json_arr);
   Serial.println(json_arr);
-  eeprom_util.write(&EepromParam.ADDR_JSON,json_arr);
+  eeprom_util.write(&EepromParam.ADDR_JSON, json_arr);
+}
+void RobotProtocol::json_is_sys_wifi(StaticJsonDocument<300> &doc) {
+  String ssid = doc["ssid"];
+  String password = doc["password"];
+  String state = doc["state"];
+
+  // save data
+  if (state == WIFI_STATE.SERVER || state == WIFI_STATE.CLIENT || state == WIFI_STATE.CLOSE) {
+    eeprom_util.write(&EepromParam.ADDR_WIFI_STATE, state);
+    // read data
+    Serial.print("READ SAVE WIFI STATE:");
+    Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_STATE));
+  }
+  if (state == WIFI_STATE.CLIENT) {
+    eeprom_util.write(&EepromParam.ADDR_WIFI_SSID, ssid);
+    eeprom_util.write(&EepromParam.ADDR_WIFI_PASSWORD, password);
+    // read data
+    Serial.print("READ SAVE WIFI SSID:");
+    Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_SSID));
+    Serial.print("READ SAVE WIFI PASSWORD:");
+    Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_PASSWORD));
+  }
+}
+void RobotProtocol::json_is_sys_web_socket_server(StaticJsonDocument<300> &doc) {
+  String host = doc["host"];
+  uint16_t port = doc["port"];
+  String path = doc["path"];
+
+  // save data
+  eeprom_util.write(&EepromParam.ADDR_WEB_SOCKET_HOST, host);
+  eeprom_util.writeUint16T(&EepromParam.ADDR_WEB_SOCKET_PORT, port);
+  eeprom_util.write(&EepromParam.ADDR_WEB_SOCKET_PATH, path);
+
+  // read data
+  Serial.print("READ SAVE WEB SOCKET HOST:");
+  Serial.println(eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_HOST));
+  Serial.print("READ SAVE WEB SOCKET PORT:");
+  Serial.println(eeprom_util.readToUint16T(&EepromParam.ADDR_WEB_SOCKET_PORT));
+  Serial.print("READ SAVE WEB SOCKET PATH:");
+  Serial.println(eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_PATH));
+}
+void RobotProtocol::json_is_sys_set_name(StaticJsonDocument<300> &doc) {
+  if (doc["name"].isNull() == true) {
+    Serial.println("Invalid json data.");
+  } else {
+    String name_str = doc["name"];
+    if (name_str.length() > 20) {
+      Serial.println("The name is too long. Please limit it to 20 characters or less.");
+      return;
+    }
+    config_json[CONFIG_KEY.NAME] = doc["name"];
+    save_config_json();
+  }
+}
+
+// 中断函数,时间到后会调用此函数
+void ARDUINO_ISR_ATTR show_expression_time_callback()
+{
+  rp.show_expression_time = -1;
+}
+void RobotProtocol::json_is_sys_show_expression(StaticJsonDocument<300> &doc) {
+  if (doc["file"].isNull() == true) {
+    Serial.println("Invalid json data.");
+  } else {
+    String file_str = doc["file"].as<const char *>();
+    show_expression = "/" + file_str;
+    if (doc["time"].isNull() == true) {
+      show_expression_time = 0;
+    } else {
+      int temp = doc["time"];
+      show_expression_time = temp < 0 ? 0 : temp * 1;
+      if(show_expression_time>0)
+      {
+        // Use 1st timer of 4 (counted from zero).
+        // Set 80 divider for prescaler (see ESP32 Technical Reference Manual for more
+        // info).
+        hw_timer_t * timer = timerBegin(0, 80, true);
+        // Attach onTimer function to our timer.
+        timerAttachInterrupt(timer, &show_expression_time_callback, true);
+        // Set alarm to call onTimer function every second (value in microseconds).
+        // Repeat the alarm (third parameter)
+        timerAlarmWrite(timer, show_expression_time*1000000, false);
+        // Start an alarm
+        timerAlarmEnable(timer);
+      }
+    }
+    Serial.print("assign:");
+    Serial.println(show_expression);
+    Serial.print("time: ");
+    Serial.print(show_expression_time);
+    Serial.println("s");
+  }
+}
+
+std::vector<String> getBinFiles() {
+  std::vector<String> binFiles;
+
+  if (!SPIFFS.begin(true)) {
+    Serial.println("--error!! SPIFFS mounting failed");
+    return binFiles;
+  }
+
+  File root = SPIFFS.open("/");
+  if (!root) {
+    Serial.println("--error!! Cannot open the root directory");
+    return binFiles;
+  }
+
+  if (!root.isDirectory()) {
+    Serial.println("--error!! The root directory is not a folder.");
+    return binFiles;
+  }
+
+  File file = root.openNextFile();
+  while (file) {
+    if (!file.isDirectory()) {
+      String fileName = String(file.name());
+      // Check if the file extension is .bin.
+      if (fileName.endsWith(".bin") || fileName.endsWith(".BIN")) {
+        //Remove the leading slash (if any)
+        if (fileName.startsWith("/")) {
+          fileName = fileName.substring(1);
+        }
+        binFiles.push_back(fileName);
+      }
+    }
+    file = root.openNextFile();
+  }
+  root.close();
+  return binFiles;
+}
+int RobotProtocol::get_expression_name(StaticJsonDocument<300> &doc) {
+  int count = 0;
+  JsonArray array = doc.createNestedArray("expression");
+  std::vector<String> binFiles = getBinFiles();
+  for (const auto &str : binFiles) {
+    array.add(str);
+    count++;
+  }
+  return count;
+}
+void RobotProtocol::json_is_sys_send_expression(int send_channel = FEEDBACK_CHANNEL.BLE) {
+  // Serialize to string
+  String expression_str;
+  // Create static JSON document (allocate memory pool size)
+  StaticJsonDocument<300> doc;
+  doc["type"] = "get_expression";
+  get_expression_name(doc);
+  serializeJson(doc, expression_str);
+
+  Serial.print("expression file:");
+  Serial.println(expression_str);
+
+  if (FEEDBACK_CHANNEL.ALL == send_channel) {
+    web_sockets_client_send_message(expression_str);
+    ble_tx_add_string(expression_str);
+  } else if (FEEDBACK_CHANNEL.BLE == send_channel) {
+    ble_tx_add_string(expression_str);
+  } else if (FEEDBACK_CHANNEL.WEB_SOCKET_CLIENT == send_channel) {
+    web_sockets_client_send_message(expression_str);
+  }
+}
+void RobotProtocol::json_is_sys_set_cloud_token(StaticJsonDocument<300> &doc) {
+  if (doc["token"].isNull() == true) {
+    Serial.println("Invalid json data.");
+  } else {
+    config_json[CONFIG_KEY.CLOUD_TOKEN] = doc["token"];
+    save_config_json();
+  }
+}
+void RobotProtocol::json_is_sys_set_openai_token(StaticJsonDocument<300> &doc) {
+  if (doc["token"].isNull() == true) {
+    Serial.println("Invalid json data.");
+  } else {
+    config_json[CONFIG_KEY.OPENAI_TOKEN] = doc["token"];
+    save_config_json();
+  }
+}
+void RobotProtocol::calibrate_servo(void)
+{
+  sms_sts.calibrate_all_servo();
+  delay(2);
+  sms_sts.on_all_servo();
 }
 void RobotProtocol::isSys(StaticJsonDocument<300> &doc) {
   String type = doc["type"];
   Serial.print("type:");
   Serial.println(type);
-
+  yield();
   if (type == MESSAGE_TYPE.SYS_WIFI) {
-    String ssid = doc["ssid"];
-    String password = doc["password"];
-    String state = doc["state"];
-
-    // save data
-    if (state == WIFI_STATE.SERVER || state == WIFI_STATE.CLIENT || state == WIFI_STATE.CLOSE) {
-      eeprom_util.write(&EepromParam.ADDR_WIFI_STATE, state);
-      // read data
-      Serial.print("READ SAVE WIFI STATE:");
-      Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_STATE));
-    }
-    if(state == WIFI_STATE.CLIENT)
-    {
-      eeprom_util.write(&EepromParam.ADDR_WIFI_SSID, ssid);
-      eeprom_util.write(&EepromParam.ADDR_WIFI_PASSWORD, password);
-      // read data
-      Serial.print("READ SAVE WIFI SSID:");
-      Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_SSID));
-      Serial.print("READ SAVE WIFI PASSWORD:");
-      Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_PASSWORD));
-    }
+    json_is_sys_wifi(doc);
   } else if (type == MESSAGE_TYPE.SYS_WEB_SOCKET_SERVER) {
-    String host = doc["host"];
-    uint16_t port = doc["port"];
-    String url = doc["url"];
-
-    // save data
-    eeprom_util.write(&EepromParam.ADDR_WEB_SOCKET_HOST, host);
-    eeprom_util.writeUint16T(&EepromParam.ADDR_WEB_SOCKET_PORT, port);
-    eeprom_util.write(&EepromParam.ADDR_WEB_SOCKET_URL, url);
-
-    // read data
-    Serial.print("READ SAVE WEB SOCKET HOST:");
-    Serial.println(eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_HOST));
-    Serial.print("READ SAVE WEB SOCKET PORT:");
-    Serial.println(eeprom_util.readToUint16T(&EepromParam.ADDR_WEB_SOCKET_PORT));
-    Serial.print("READ SAVE WEB SOCKET URL:");
-    Serial.println(eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_URL));
+    json_is_sys_web_socket_server(doc);
   } else if (type == MESSAGE_TYPE.SYS_RESTART) {
     ESP.restart();
   } else if (type == MESSAGE_TYPE.GET_DEVICE_INFO) {
-    feedback_util_send_message(FEEDBACK_CHANNEL.BLE);
+    feedback_util_send_message(FEEDBACK_CHANNEL.ALL);
   } else if (type == MESSAGE_TYPE.OFF_SERVO) {
     sms_sts.off_all_servo();
   } else if (type == MESSAGE_TYPE.ON_SERVO) {
     sms_sts.on_all_servo();
   } else if (type == MESSAGE_TYPE.CALIBRATION_SERVO) {
-    sms_sts.calibrate_all_servo();
-    delay(2);
-    sms_sts.on_all_servo();
+    calibrate_servo();
+  } else if (type == MESSAGE_TYPE.SET_SERVO_ID1) {
+    sms_sts.set_servo_id(2,1);
+  } else if (type == MESSAGE_TYPE.SET_SERVO_ID2) {
+    sms_sts.set_servo_id(1,2);
   } else if (type == MESSAGE_TYPE.SET_NAME) {
-
-    if (doc["name"].isNull() == true) {
-      Serial.println("Invalid json data.");
-    }else{
-      String name_str = doc["name"];
-      if(name_str.length() > 20)
-      {
-        Serial.println("The name is too long. Please limit it to 20 characters or less.");
-        return;
-      }
-      config_json[CONFIG_KEY.NAME] = doc["name"];
-      save_config_json();
-    }
+    json_is_sys_set_name(doc);
+  } else if (type == MESSAGE_TYPE.SHOW_EXPRESSION) {
+    json_is_sys_show_expression(doc);
+  } else if (type == MESSAGE_TYPE.GET_EXPRESSION) {
+    json_is_sys_send_expression(FEEDBACK_CHANNEL.ALL);
+  } else if (type == MESSAGE_TYPE.SET_CLOUD_TOKEN) {
+    json_is_sys_set_cloud_token(doc);
+  } else if (type == MESSAGE_TYPE.SET_OPENAI_TOKEN) {
+    json_is_sys_set_openai_token(doc);
+  } else {
+    Serial.println("Invalid json keyworeds.\r\n");
   }
 }
 void RobotProtocol::parseJson(StaticJsonDocument<300> &doc) {
   if (doc["type"].isNull() == true) {
+    Serial.println("JSON type is null ");
+    yield();
     parseBasic(doc);
   } else {
+    Serial.println("JSON type is sys ");
     isSys(doc);
   }
 }
-void RobotProtocol::get_dev_name(char dev_name[])
-{
+void RobotProtocol::get_dev_name(char dev_name[]) {
   String name_str = config_json["name"];
-  unsigned int name_len = name_str.length()+1;
-  name_len = name_len>20 ? 20 : name_len;
-  name_str.toCharArray(dev_name,name_len);
+  unsigned int name_len = name_str.length() + 1;
+  name_len = name_len > 20 ? 20 : name_len;
+  name_str.toCharArray(dev_name, name_len);
   Serial.print("BLE name :");
   Serial.println(dev_name);
   dev_name[19] = 0;
 }
-void build_dev_name(char dev_name[])
-{
+void RobotProtocol::build_dev_name(char dev_name[]) {
   char basc[] = "navbot_en01-";
   uint8_t mac[7];
   esp_read_mac(mac, ESP_MAC_BT);
@@ -278,42 +429,38 @@ void build_dev_name(char dev_name[])
   }
   sprintf(dev_name, "%s%s", basc, mac);
 }
-void RobotProtocol:: config_json_init(void)
-{
-  eeprom_util.init(); 
+void RobotProtocol::config_json_init(void) {
+  eeprom_util.init();
   String json_str = eeprom_util.read(&EepromParam.ADDR_JSON);
   DeserializationError error = deserializeJson(config_json, json_str);
-  if(error)
-  {
+  if (error) {
     Serial.println("The file was not found 'config.json'.");
     char name[20];
     build_dev_name(name);
     String name_str = name;
     config_json["name"] = name_str;
-    save_config_json(); 
+    save_config_json();
   }
   printDoc(config_json);
 }
-void RobotProtocol::json_test(char* json_arr)
-{
+void RobotProtocol::json_test(char *json_arr) {
   Serial.println("json test :");
   Serial.println(json_arr);
   String payload_str = String(json_arr);
   StaticJsonDocument<300> doc;
   DeserializationError error = deserializeJson(doc, payload_str);
-  if(error)
-  {
+  if (error) {
     Serial.println("json data error");
-  }else{
+  } else {
     parseJson(doc);
   }
-  
-  
 }
 
 void RobotProtocol::parseBasic(StaticJsonDocument<300> &doc) {
   // printDoc(doc);
   // isSys(doc);
+
+  delay(0);
   _now_buf[2] = BASIC;
 
   String dir = doc["dir"];
@@ -401,30 +548,3 @@ void RobotProtocol::parseBasic(StaticJsonDocument<300> &doc) {
   }
   _now_buf[15] = abs(joy_y);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

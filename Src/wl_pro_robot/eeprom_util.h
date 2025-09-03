@@ -2,7 +2,7 @@
 
 #include "robot.h"
 
-#define EEPROM_SIZE  1024
+#define EEPROM_SIZE 1024
 
 
 typedef struct EepromObject {
@@ -23,9 +23,9 @@ struct {
   // web socket info
   EepromObject ADDR_WEB_SOCKET_HOST = { "addr_web_socket_host", 120, 20 };
   EepromObject ADDR_WEB_SOCKET_PORT = { "addr_web_socket_port", 140, 10 };
-  EepromObject ADDR_WEB_SOCKET_URL = { "addr_web_socket_url", 150, 50 };
+  EepromObject ADDR_WEB_SOCKET_PATH = { "addr_web_socket_path", 150, 50 };
 
-  EepromObject ADDR_JSON = { "addr_json", 200,512};
+  EepromObject ADDR_JSON = { "addr_json", 200, 1024 };
 } EepromParam;
 
 class EepromUtil {

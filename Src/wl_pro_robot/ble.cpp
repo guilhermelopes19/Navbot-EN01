@@ -46,7 +46,7 @@ class MyCallbacks : public BLECharacteristicCallbacks {
         ble_rx.frame[i] = *(rxData + i);  //Transfer data
       }
       if (ble_rx.remaining_pack == 0) {
-        ble_rx.remaining_pack = ble_rx.frame[3]; 
+        ble_rx.remaining_pack = ble_rx.frame[3];
       }
       //Status setting and acquisition commands
       ble_rx.state = BLE_STATE_RECEIVE_OK;
@@ -69,7 +69,7 @@ class MyServerCallbacks : public BLEServerCallbacks {
 
 void ble_init() {
   char ble_name[20] = { 0 };
-  rp.get_dev_name(ble_name);
+  rp.build_dev_name(ble_name);
   // Create the BLE Device
   BLEDevice::init(ble_name);
   // Create the BLE Server
@@ -132,7 +132,7 @@ void ble_rx_processing(void) {
     {
       //Merge the last package of data；if there is only one package of data, that is also the last one
       ble_rx_data_add(&ble_rx.frame[5], 15);
-
+      ble_tx.cmd = ble_rx.cmd;
       switch (ble_rx.cmd) {
         case CMD_MANEUVER:
           {
@@ -157,32 +157,32 @@ void ble_rx_processing(void) {
   }
 }
 void ble_tx_processing(void) {
-  
+
   if (ble_tx.state == BLE_STATE_SEND_READY || ble_tx.state == BLE_STATE_SEND_BEING && deviceConnected == true) {
     // `ble_tx.index` is the index of the current data being sent.
     //If it is greater than or equal to the total length,
     //it indicates that the sending is complete or there is no data to be sent.
     if (ble_tx.index >= ble_tx.len) {
       ble_tx.state = BLE_STATE_SEND_FINISH;
-      Serial.printf("finish!!!  ble_tx.index >= ble_tx.len  , ble_tx.index : %d , ble_tx.len : %d \r\n",ble_tx.index , ble_tx.len);
+      Serial.printf("finish!!!  ble_tx.index >= ble_tx.len  , ble_tx.index : %d , ble_tx.len : %d \r\n", ble_tx.index, ble_tx.len);
       return;
     }
-    static int8_t time_lag = 10;
-    if(time_lag > 0){
-      time_lag --;
+    static int8_t time_lag = 100;
+    if (time_lag > 0) {
+      time_lag -= 10;
       return;
-    }else{
-      time_lag = 10;
+    } else {
+      time_lag = 20;
     }
 
-    Serial.println("ble send frame");
+    Serial.print("ble send frame -> ");
     ble_tx.state = BLE_STATE_SEND_BEING;
 
     ble_tx.frame[0] = 0x55;
     ble_tx.frame[1] = 0xAA;
     ble_tx.frame[2] = ble_tx.cmd;
-    ble_tx.frame[3] = (ble_tx.len - ble_tx.index) / 15;
-    ble_tx.frame[4] = 0;//(ble_tx.len) / 15 ;
+    ble_tx.frame[3] = (ble_tx.len - ble_tx.index) / 15 - ((ble_tx.len - ble_tx.index)%15 ? 0:1);
+    ble_tx.frame[4] = 0;  //(ble_tx.len) / 15 ;
 
     // ble_tx.frame[0] = '-';
     // ble_tx.frame[1] = '-';
@@ -193,16 +193,15 @@ void ble_tx_processing(void) {
 
     memcpy(&ble_tx.frame[5], &ble_tx.data[ble_tx.index], 15);
 
-    
+
     ble_send_data((uint8_t*)ble_tx.frame, 20);
 
     uint8_t i;
-    for(i=0;i<20;i++)
-    {
-      Serial.printf("%02x ",ble_tx.frame[i]);
+    for (i = 0; i < 20; i++) {
+      Serial.printf("%02x ", ble_tx.frame[i]);
     }
     Serial.println("----");
-    
+
     ble_tx.index += 15;
   }
 }
@@ -256,7 +255,7 @@ void ble_rx_data_add(uint8_t* data, uint8_t len) {
 
 void ble_rx_data_clear() {
   int i;
-  for (i = 0; i < 50; i++) {
+  for (i = 0; i < BLE_DATA_SIZE; i++) {
     ble_rx.data[i] = 0;
   }
   ble_rx.index = 0;
@@ -359,16 +358,16 @@ void ble_cmd_restart_processing() {
 void ble_tx_add_data(char* data, int len) {
   memset(ble_tx.data, 0, BLE_DATA_SIZE);
   memcpy(ble_tx.data, data, len);
-  ble_tx.len   = len;
-  ble_tx.index = 0 ;
+  ble_tx.len = len;
+  ble_tx.index = 0;
   ble_tx.state = BLE_STATE_SEND_READY;
 
   Serial.println("ble_tx_add_data:");
-  Serial.println((char*) ble_tx.data);
+  Serial.println((char*)ble_tx.data);
 }
 void ble_tx_add_string(String str) {
   char buffer[512] = { 0 };
-  int len = 1+str.length();
+  int len = 1 + str.length();
   str.toCharArray(buffer, len);
   ble_tx_add_data(buffer, len);
 }
@@ -388,14 +387,13 @@ void ble_test(void) {
   Serial.begin(115200);
   ble_init();
   while (1) {
-    if(ten_msec_tick()){
+    if (ten_msec_tick()) {
       ble_loop();
     }
     if (one_second_tick()) {
 
       test_rx_json("{\"type\":\"get_device_info\"}");
     }
-    
   }
 }
 void test_rx_json(char* data) {
