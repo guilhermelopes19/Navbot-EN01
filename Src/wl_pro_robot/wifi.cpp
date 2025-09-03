@@ -80,9 +80,11 @@ void wifi_init(void) {
   if (wifi_state == WIFI_STATE.CLIENT) {
     Serial.println("start wifi client...");
     wifi_set_sta();  // wifi client
+    rp.wifi_state = WIFI_CLIENT;
   } else if (wifi_state == WIFI_STATE.SERVER) {
     Serial.println("start wifi server...");
     wifi_set_ap();  // wifi server
+    rp.wifi_state = WIFI_SERVOR;
   } else {
 
   }

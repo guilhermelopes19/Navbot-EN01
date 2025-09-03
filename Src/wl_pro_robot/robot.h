@@ -89,6 +89,10 @@ typedef enum {
   BASIC = 0,
 } Robot_Mode_t;
 
+#define WIFI_CLOSE 0
+#define WIFI_SERVOR 1
+#define WIFI_CLIENT 2
+
 class RobotProtocol {
 public:
   double battery_voltage;
@@ -103,7 +107,7 @@ public:
   bool socket_connected = false;
   bool ble_connected = false;
   bool wifi_connected = false;
-
+  char wifi_state      = WIFI_CLOSE;
 
   String show_expression;
   int show_expression_time = -1;  //

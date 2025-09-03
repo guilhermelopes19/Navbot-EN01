@@ -16,7 +16,19 @@ static String get_dev_mac() {
 
   return String(mac_str);
 }
-
+String get_wifi_ip(void)
+{
+  if(rp.wifi_state == WIFI_CLIENT)
+  {
+    IPAddress ip = WiFi.localIP();
+    String ipString = ip.toString();
+    return ipString;
+  }else if(rp.wifi_state == WIFI_SERVOR){
+    return "192.168.1.11";
+  }
+  
+  return "null";
+}
 String get_device_info() {
   // Serialize to string
   String jsonStr;
@@ -45,7 +57,7 @@ String get_device_info() {
   doc["centigrade"] = rp.centigrade;
   doc["name"] = rp.config_json[CONFIG_KEY.NAME];
   doc["charge"] = rp.charge;
-  doc["IP"] = WiFi.localIP();
+  doc["IP"] = get_wifi_ip();
   // rp.get_expression_name(doc);
   doc["cloud_token"] = rp.config_json[CONFIG_KEY.CLOUD_TOKEN];
   doc["openAI_token"] = rp.config_json[CONFIG_KEY.OPENAI_TOKEN];

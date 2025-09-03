@@ -51,8 +51,8 @@ void web_sockets_client_init(void) {
     String web_socket_client_path = eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_PATH);
 
     if (web_socket_client_host.length() > 0 && web_socket_client_port > 0 && web_socket_client_path.length() > 0) {
-      String connectionString =
-        (web_socket_client_port == 443 ? "wss://" : "ws://") + web_socket_client_host + ":" + String(web_socket_client_port) + web_socket_client_path;
+      String cloud_token = rp.config_json[CONFIG_KEY.CLOUD_TOKEN];
+      String connectionString = "wss://hub.navbot.com:443/ws/" + cloud_token;
 
       Serial.println("WebSocket Connecting Address: " + connectionString);
 

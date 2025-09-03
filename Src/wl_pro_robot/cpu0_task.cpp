@@ -288,8 +288,8 @@ void delayed_sleep_mode() {
     show_file_name = ("/Relaxed.bin");      //放松
     sleep_time--;
   } else {
-    show_file_name = ("/Bored.bin");
-    frames_time = 30;
+    show_file_name = ("/z.bin");
+    frames_time = 500;
   }
 }
 
