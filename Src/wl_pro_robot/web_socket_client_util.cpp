@@ -2,6 +2,9 @@
 #include <WebSocketsClient.h>
 #include "robot.h"
 
+bool wss_reset_flag = false;
+bool wss_delay_reset_flag = false;
+
 MyWebSocketsClientData my_wss_data;
 
 WebSocketsClient webSocketClient = WebSocketsClient();
@@ -14,8 +17,6 @@ void eventCallback(WStype_t type, uint8_t *payload, size_t length) {
         rp.socket_connected = true;
         break;
       }
-
-
     case WStype_CONNECTED:
       {
         printf("WEB SOCKET CLIENT:CONNECTED !!\n");
@@ -25,15 +26,13 @@ void eventCallback(WStype_t type, uint8_t *payload, size_t length) {
       break;
   }
 
-
-
   if (type == WStype_TEXT) {
 
     my_wss_data.length = length;
 
     my_wss_data.buffer = (char*)malloc(length+1);
     memcpy(my_wss_data.buffer,payload,length);
-    *(my_wss_data.buffer+length+1) = 0;
+    *(my_wss_data.buffer+length) = 0;
 
     my_wss_data.state = WSS_STATE_WAITING_PROCSSING;
 
@@ -42,17 +41,19 @@ void eventCallback(WStype_t type, uint8_t *payload, size_t length) {
 
   }
 }
-
-void web_sockets_client_init(void) {
-
+void web_sockets_client_init(void){
+  wss_reset_flag = true;
+}
+void _web_sockets_client_init(void) {
+  return;
   if (get_wifi_state() == WIFI_STATE.CLIENT) {
-    String web_socket_client_host = eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_HOST);
-    uint16_t web_socket_client_port = eeprom_util.readToUint16T(&EepromParam.ADDR_WEB_SOCKET_PORT);
-    String web_socket_client_path = eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_PATH);
-
+    String web_socket_client_host = "hub.navbot.com";       //eeprom_util.read(&EepromParam.ADDR_WEB_SOCKET_HOST);
+    uint16_t web_socket_client_port = 443;                    //eeprom_util.readToUint16T(&EepromParam.ADDR_WEB_SOCKET_PORT);
+    String web_socket_client_path = rp.config_json[CONFIG_KEY.CLOUD_TOKEN];
+    
     if (web_socket_client_host.length() > 0 && web_socket_client_port > 0 && web_socket_client_path.length() > 0) {
-      String cloud_token = rp.config_json[CONFIG_KEY.CLOUD_TOKEN];
-      String connectionString = "wss://hub.navbot.com:443/ws/" + cloud_token;
+      web_socket_client_path = "/ws/" + web_socket_client_path;
+      String connectionString = "wss://" + web_socket_client_host + ":" + String(web_socket_client_port) + web_socket_client_path;
 
       Serial.println("WebSocket Connecting Address: " + connectionString);
 
@@ -92,13 +93,54 @@ void web_sockets_client_processing(void)
     printf("eFuse Two Point: Supported\n");
     String mode_str = doc["mode"];
     rp.parseJson(doc);
+    free(my_wss_data.buffer);
   }
 }
 
+void wss_delay_reset(void)
+{
+  static unsigned long lastMillis = 0;
+  unsigned long currentMillis = millis();
+  if(currentMillis - lastMillis > 1000){
+    lastMillis =  currentMillis;
+  }else{
+    return;
+  }
+  /*
+    Run once every 1 second, and initialize after 3 seconds.
+  */
+  static char count_s = 0;
 
+  if(count_s++ > 3){
+    count_s = 0;
+    wss_delay_reset_flag = false;
+    _web_sockets_client_init();
+    Serial.println("Web Socket Reset");
+  }
+}
 void web_sockets_client_loop(void) {
+
+
+  /*
+  If there is no Wi-Fi connection, the socket will not be established.
+  */
+  if (WiFi.status() != WL_CONNECTED) return;
+
+
+
   web_sockets_client_processing();
   webSocketClient.loop();
+  if(wss_reset_flag == true)
+  {
+    wss_reset_flag = false;
+    webSocketClient.disconnect();
+    Serial.println("Web socket close, and initialize after 3 seconds");
+    wss_delay_reset_flag = true;
+  }
+  if(wss_delay_reset_flag == true)
+  {
+    wss_delay_reset();
+  }
 }
 
 
@@ -107,3 +149,16 @@ void web_sockets_client_send_message(String value) {
     webSocketClient.sendTXT(value);
   }
 }
+
+
+void wss_reset(void)
+{
+  wss_reset_flag = true;
+}
+
+
+
+
+
+
+

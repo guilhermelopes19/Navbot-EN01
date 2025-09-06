@@ -158,12 +158,24 @@ void ble_rx_processing(void) {
 void ble_tx_processing(void) {
 
   /*
-  If the queue is empty or the Bluetooth is not connected, no sending will be carried out.
+  If the queue is empty, no sending will be carried out.
   */
-  if(ble_tx_q.getCount()==0  || rp.ble_connected == false) //
-  {
+  if(ble_tx_q.getCount()==0){
     return;
   }
+  /*
+  If the queue is not empty but the Bluetooth connection is not established, then clear the queue.
+  */
+  if(rp.ble_connected == false){
+    BleDataTypDef* _ble_tx;
+    ble_tx_q.peek(&_ble_tx);
+    ble_tx_q.drop();
+    free(_ble_tx);
+    Serial.print("BLE not connected, deleing queue; Queue remaining: ");Serial.println(ble_tx_q.getCount());
+    return;
+  }
+  
+
   /*
   Read the queue data. After sending is completed, manual queue deletion and memory release are required.
   */
@@ -190,7 +202,7 @@ void ble_tx_processing(void) {
     time_tick -= 10;
     return;
   } else {
-    time_tick = 20;
+    time_tick = 100;
   }
 
   Serial.print("ble send frame -> ");
@@ -364,6 +376,11 @@ void ble_cmd_restart_processing() {
   rp.parseJson(doc);
 }
 void ble_tx_add_data(char* data, int len) {
+
+  if(ble_tx_q.isFull() ==true){
+    Serial.println("Queue is full, failed to add data");
+    return ;
+  }
 
   if(len>BLE_DATA_SIZE-1){
     len = BLE_DATA_SIZE-1;

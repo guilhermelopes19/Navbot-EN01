@@ -102,15 +102,24 @@ void wifi_restart(void)
 {
   wifi_restart_flag = true;
 }
+
+
+bool wifi_status_now = false;
+bool wifi_status_last = false;
+
+bool wifi_connect_ok()
+{
+  return wifi_status_now;
+}
+
+
 void wifi_loop(void) {
-  static char wifi_status_now = 0;
-  static char wifi_status_last = 0;
   static char connect_count_down = 10;
 
   if(wifi_restart_flag == true)
   {
-    wifi_status_now = 0;
-    wifi_status_last = 1;
+    wifi_status_now = false;
+    wifi_status_last = true;
     WiFi.disconnect(true);  // true = close
   }
 
@@ -123,12 +132,12 @@ void wifi_loop(void) {
       wifi_set_sta();
       connect_count_down = 10;
     }
-    wifi_status_now = 0;
+    wifi_status_now = false;
 
   } else  //Print the IP information once when connecting via wifi
   {
     connect_count_down = 1;
-    if (wifi_status_now == 0) {
+    if (wifi_status_now == false) {
       // Print the IP address of ESP-01S
       Serial.print("IP Address: ");
       Serial.println(WiFi.localIP());

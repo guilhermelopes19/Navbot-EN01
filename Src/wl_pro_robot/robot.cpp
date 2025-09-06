@@ -8,6 +8,8 @@
 #include <vector>
 #include "cpu0_task.h"
 #include "ble.h"
+#include "web_socket_client_util.h"
+
 int uncontrolable = 0;
 int BAT_PIN = 35;
 esp_adc_cal_characteristics_t adc_chars;
@@ -241,7 +243,7 @@ void RobotProtocol::json_is_sys_set_name(StaticJsonDocument<300> &doc) {
   }
 }
 
-// 中断函数,时间到后会调用此函数
+// Interrupt function - This function will be called when the time is up.
 void ARDUINO_ISR_ATTR show_expression_time_callback()
 {
   rp.show_expression_time = -1;
@@ -354,6 +356,7 @@ void RobotProtocol::json_is_sys_set_cloud_token(StaticJsonDocument<300> &doc) {
   } else {
     config_json[CONFIG_KEY.CLOUD_TOKEN] = doc["token"];
     save_config_json();
+    wss_reset();
   }
 }
 void RobotProtocol::json_is_sys_set_openai_token(StaticJsonDocument<300> &doc) {
@@ -413,7 +416,7 @@ void RobotProtocol::parseJson(StaticJsonDocument<300> &doc) {
     yield();
     parseBasic(doc);
   } else {
-    Serial.println("JSON type is sys ");
+    Serial.println("JSON type is sys");
     isSys(doc);
   }
 }
@@ -457,8 +460,8 @@ void RobotProtocol::config_json_init(void) {
   printDoc(config_json);
 }
 /*
-  当状态发生改变时，通过蓝牙主动发送状态同步给上位机
-  此函数10ms调用一次
+  When the status changes, it actively sends the status synchronization to the upper computer via Bluetooth.
+This function is called once every 10 milliseconds.
 */
 void RobotProtocol::send_status(void)
 {
@@ -469,14 +472,14 @@ void RobotProtocol::send_status(void)
   }
 }
 /*
-固定心跳包
+Fixed heartbeat packet
 */
 void RobotProtocol::send_heartbeat(void)
 {
 
 }
 void RobotProtocol::json_test(char *json_arr) {
-  Serial.println("json test :");
+  Serial.print("json test: ");
   Serial.println(json_arr);
   String payload_str = String(json_arr);
   StaticJsonDocument<300> doc;
@@ -581,6 +584,9 @@ void RobotProtocol::parseBasic(StaticJsonDocument<300> &doc) {
   _now_buf[6] = abs(roll);
 
   int linear = doc["linear"];
+  if(linear < 0){
+    linear = 0;
+  }
   wrobot.linear = linear;
   if (linear >= 0) {
     _now_buf[7] = 0;
@@ -590,6 +596,9 @@ void RobotProtocol::parseBasic(StaticJsonDocument<300> &doc) {
   _now_buf[8] = abs(linear);
 
   int angular = doc["angular"];
+  if(angular < 0){
+    angular = 0;
+  }
   wrobot.angular = angular;
   if (angular >= 0) {
     _now_buf[9] = 0;
@@ -608,7 +617,7 @@ void RobotProtocol::parseBasic(StaticJsonDocument<300> &doc) {
   }
 
   int joy_x = doc["joy_x"];
-  wrobot.joyx = joy_x;
+  wrobot.joyx = joy_x * angular / 100;
   if (joy_x >= 0) {
     _now_buf[12] = 0;
   } else {
@@ -617,7 +626,7 @@ void RobotProtocol::parseBasic(StaticJsonDocument<300> &doc) {
   _now_buf[13] = abs(joy_x);
 
   int joy_y = doc["joy_y"];
-  wrobot.joyy = joy_y;
+  wrobot.joyy = joy_y * linear / 100;
   if (joy_y >= 0) {
     _now_buf[14] = 0;
   } else {

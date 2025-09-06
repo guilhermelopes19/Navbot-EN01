@@ -7,7 +7,7 @@
 #define SHOW_MODE_DEFAULT 0
 #define SHOW_MODE_USER_ASSIGN 1
 
-#define SLEEP_COUNT_DOWN 5
+#define SLEEP_COUNT_DOWN 10
 
 void maneuver_to_expression(void);
 void delayed_sleep_mode(void);
@@ -83,7 +83,7 @@ enum {
   DANCE4 = 0x0800,
 } ManeuverStateTypDef;
 
-//时间到则准备退出，之所以使用-1，因为0表示定时无效
+//When the time is up, prepare to exit. The reason for using -1 is that 0 indicates that the timer is invalid.
 bool exit_user_expression(void)
 {
   if(rp.show_expression_time == -1){
@@ -105,7 +105,7 @@ void default_show_mode(void) {
   
   maneuver_to_expression();
 
-  if (!SPIFFS.exists(show_file_name))   //文件不存在
+  if (!SPIFFS.exists(show_file_name))   //file does not exist
   {
     OLED_Fill(0, 0, OLED_W, OLED_H, 0x00);
     String show_str = "No file " + show_file_name;
@@ -114,24 +114,27 @@ void default_show_mode(void) {
     return;
   }
 
-  file = SPIFFS.open(show_file_name);  //打开文件，以及解析文件头
+  file = SPIFFS.open(show_file_name);  //Open the file and parse the file header
   file.read((uint8_t*)&file_header, sizeof(file_header));
   frames_num = file_header.frames_num;
   width = file_header.width;
   height = file_header.height;
   x_coord = (160 - width) / 2;
 
-  if (last_frames_width != width) {     //两次文件的图像尺寸不同，则需要清屏一次
+  /*
+  If the image sizes of the two files are different, then the screen needs to be cleared once.
+  */
+  if (last_frames_width != width) {     
     OLED_Fill(0, 0, OLED_W, OLED_H, 0x00);
   }
-  last_frames_width = width;    //记录本次文件的尺寸
+  last_frames_width = width; 
   uint8_t i=0;
-  for(i=0;i<frames_num;i++){ //逐帧刷新
-    if(file_header.gray_level == 2){      //单色
+  for(i=0;i<frames_num;i++){ //
+    if(file_header.gray_level == 2){      //homochromy
       frames_size = width * height / 8;
       file.read(frames_data, frames_size);
       OLED_DrawSingleBMP(x_coord, 0, width, height, frames_data,10, 0);
-    }else if(file_header.gray_level == 16){//16灰度
+    }else if(file_header.gray_level == 16){//16 levels of gray
       frames_size = width * height / 2;
       file.read(frames_data, frames_size);
       OLED_DrawBMP(x_coord, 0, width, height, frames_data, 0);
@@ -150,7 +153,7 @@ void show_user_assign_expression(void) {
 
   show_file_name = rp.show_expression;
 
-  if (!SPIFFS.exists(show_file_name))   //文件不存在
+  if (!SPIFFS.exists(show_file_name))   // 
   {
     OLED_Fill(0, 0, OLED_W, OLED_H, 0x00);
     OLED_ShowString(0, 0, "No file ...", 16, 0);
@@ -158,23 +161,23 @@ void show_user_assign_expression(void) {
     return;
   }
 
-  file = SPIFFS.open(show_file_name);  //打开文件，以及解析文件头
+  file = SPIFFS.open(show_file_name);  // 
   file.read((uint8_t*)&file_header, sizeof(file_header));
   frames_num = file_header.frames_num;
   width = file_header.width;
   height = file_header.height;
   x_coord = (160 - width) / 2;
-  if (last_frames_width != width) {     //两次文件的图像尺寸不同，则需要清屏一次
+  if (last_frames_width != width) {     // 
     OLED_Fill(0, 0, OLED_W, OLED_H, 0x00);
   }
-  last_frames_width = width;    //记录本次文件的尺寸
+  last_frames_width = width;    // 
   uint8_t i=0;
-  for(i=0;i<frames_num;i++){ //逐帧刷新
-    if(file_header.gray_level == 2){      //单色
+  for(i=0;i<frames_num;i++){ // 
+    if(file_header.gray_level == 2){      // 
       frames_size = width * height / 8;
       file.read(frames_data, frames_size);
       OLED_DrawSingleBMP(x_coord, 0, width, height, frames_data,10, 0);
-    }else if(file_header.gray_level == 16){//16灰度
+    }else if(file_header.gray_level == 16){// 
       frames_size = width * height / 2;
       file.read(frames_data, frames_size);
       OLED_DrawBMP(x_coord, 0, width, height, frames_data, 0);
@@ -194,7 +197,7 @@ bool show_mode_check(void) {
   switch (show_mode) {
     case SHOW_MODE_DEFAULT:
       {
-        if (rp.show_expression_time > -1)  //时间有效，则说明需要显示指定表情
+        if (rp.show_expression_time > -1)  //If the time is valid, it indicates that the specified expression needs to be displayed.
         {
           show_mode = SHOW_MODE_USER_ASSIGN;
           frames_time = 50;
@@ -204,7 +207,7 @@ bool show_mode_check(void) {
       break;
     case SHOW_MODE_USER_ASSIGN:
       {
-        if (rp.show_expression_time == -1 )  //-1表示时间已经到
+        if (rp.show_expression_time == -1 )  //-1 indicates that the time has arrived.
         {
           show_mode = SHOW_MODE_DEFAULT;
           return true;
@@ -282,10 +285,10 @@ void maneuver_to_expression(void) {
 
 void delayed_sleep_mode() {
   if (sleep_time > SLEEP_COUNT_DOWN / 2) {
-    show_file_name = ("/Bored.bin");   //无聊
+    show_file_name = ("/Bored.bin");   //
     sleep_time--;
   } else if (sleep_time > 0) {
-    show_file_name = ("/Relaxed.bin");      //放松
+    show_file_name = ("/Relaxed.bin");      //
     sleep_time--;
   } else {
     show_file_name = ("/z.bin");
