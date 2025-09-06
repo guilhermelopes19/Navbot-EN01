@@ -7,14 +7,10 @@
 extern "C" {
 #endif
 
-// 寄存器地址定义
 #define DR_REG_GPIO_BASE 0x3FF44000
 #define GPIO_OUT_W1TS_REG (DR_REG_GPIO_BASE + 0x0008)
 #define GPIO_OUT_W1TC_REG (DR_REG_GPIO_BASE + 0x000C)
-
-// IO_MUX寄存器基地址
 #define DR_REG_IO_MUX_BASE 0x3FF49000
-// 方便操作的宏定义
 #define SET_BIT(addr, bit) (*(volatile uint32_t *)(addr)) |= (1UL << (bit))
 
 #define SPI_SCK 2

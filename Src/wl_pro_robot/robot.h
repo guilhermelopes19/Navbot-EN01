@@ -1,13 +1,14 @@
-
 #pragma once
 
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include "esp_adc_cal.h"
 #include "feedback_util.h"
+#include "eeprom_util.h"
 
 
 #define CONFIG_JSON_SIZE 300
+#define WIFI_INFO_JSON_SIZE 110
 
 typedef struct {
   int height = 38;
@@ -82,6 +83,12 @@ struct {
   const String OPENAI_TOKEN = "openai_token";
 } CONFIG_KEY;
 
+struct {
+
+  const String SSID = "ssid";
+  const String PASSWORD = "password";
+  const String STATE = "state";
+} WIFI_INFO_KEY;
 
 
 // Robot mode enumeration type
@@ -109,13 +116,15 @@ public:
   bool wifi_connected = false;
   char wifi_state      = WIFI_CLOSE;
 
+  bool send_status_flag = false;
+
   String show_expression;
   int show_expression_time = -1;  //
 
 
-
+  StaticJsonDocument<WIFI_INFO_JSON_SIZE> wifi_info_json;
   StaticJsonDocument<CONFIG_JSON_SIZE> config_json;
-
+  StaticJsonDocument<512> status_json;
 
   RobotProtocol(uint8_t len);
   ~RobotProtocol();
@@ -135,6 +144,9 @@ public:
   void isSys(StaticJsonDocument<300> &doc);
   void parseBasic(StaticJsonDocument<300> &doc);
   void parseJson(StaticJsonDocument<300> &doc);
+  void send_status(void);
+  void send_heartbeat(void);
+  void save_wifi_info_json(void);
   void json_test(char *json_arr);
 private:
   uint8_t *_now_buf;

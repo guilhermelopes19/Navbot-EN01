@@ -62,5 +62,6 @@ void ble_test(void);
 void ble_send_string(const String &message);
 void ble_tx_add_string(String str);
 void ble_rx_add_data(char *data, int len);
+void ble_tx_add_json(StaticJsonDocument<1024> &doc);
 
-extern BleDataTypDef ble_rx, ble_tx;
+extern BleDataTypDef ble_rx;

@@ -1,10 +1,9 @@
 #include "wifi.h"
 #include "robot.h"
 #include "eeprom_util.h"
+#include "ble.h"
 
-char wifi_ssid[50] = { 0 };
-char wifi_password[30] = { 0 };
-char eeprom_once = 0;
+bool wifi_restart_flag = false;
 
 WIFI_STATE_TypeDef WIFI_STATE;
 
@@ -17,14 +16,14 @@ IPAddress AP_IP(192, 168, 1, 11);
 IPAddress AP_GATEWAY(192, 168, 1, 11);
 IPAddress AP_SUBNET(255, 255, 255, 0);
 
-
 char wifi_mode;
+
 
 // ESP-01S access the WiFi network in AP mode
 void wifi_set_sta() {
   //Read the wifi information
-  eeprom_util.read(&EepromParam.ADDR_WIFI_SSID, wifi_ssid);
-  eeprom_util.read(&EepromParam.ADDR_WIFI_PASSWORD, wifi_password);
+  String wifi_ssid = rp.wifi_info_json[WIFI_INFO_KEY.SSID];
+  String wifi_password = rp.wifi_info_json[WIFI_INFO_KEY.PASSWORD];
 
   String dev_name = rp.config_json[CONFIG_KEY.NAME];
   const char* sta_name = dev_name.c_str();
@@ -32,7 +31,10 @@ void wifi_set_sta() {
   WiFi.setHostname(sta_name);
   wifi_mode = WIFI_STA;
   WiFi.mode(WIFI_STA);
-  WiFi.begin(wifi_ssid, wifi_password);
+  char* ssid_arr = (char*)wifi_ssid.c_str();
+  char* password_arr = (char*)wifi_password.c_str();
+
+  WiFi.begin(ssid_arr, password_arr);
 
   String wifi_info = String("ssid:") + wifi_ssid + ",password:" + wifi_password;
   Serial.println("Connecting to Wifi: " + wifi_info);
@@ -63,25 +65,32 @@ bool is_wifi_state(String str)
   }
   return false;
 }
-String get_wifi_state(void) {
-  char state_arr[EepromParam.ADDR_WIFI_STATE.size];
-  eeprom_util.read(&EepromParam.ADDR_WIFI_STATE, state_arr);
-  String state = state_arr;
-  if (is_wifi_state(state) == false) {
-    state = WIFI_STATE.SERVER;
-    eeprom_util.write(&EepromParam.ADDR_WIFI_STATE, state);
+void get_wifi_info_json(void) {
+
+  char state_arr[EepromParam.ADDR_WIFI_INFO_JSON.size];
+  eeprom_util.read(&EepromParam.ADDR_WIFI_INFO_JSON, (char*)state_arr);
+  String jsonStr = String(state_arr);
+  deserializeJson(rp.wifi_info_json, jsonStr);
+
+  if (is_wifi_state(rp.wifi_info_json[WIFI_INFO_KEY.STATE]) == false) {
+    rp.wifi_info_json[WIFI_INFO_KEY.STATE] = WIFI_STATE.SERVER;
+    rp.save_wifi_info_json();
   }
-  return state;
+}
+String get_wifi_state(void){
+  String str = rp.wifi_info_json[WIFI_INFO_KEY.STATE];
+  return str;
 }
 
 void wifi_init(void) {
-  String wifi_state = get_wifi_state();
-  Serial.printf("wifi_state: %s\n", wifi_state.c_str());
-  if (wifi_state == WIFI_STATE.CLIENT) {
+  get_wifi_info_json();
+  Serial.printf("wifi_state: %s\n", get_wifi_state());
+
+  if (get_wifi_state() == WIFI_STATE.CLIENT) {
     Serial.println("start wifi client...");
     wifi_set_sta();  // wifi client
     rp.wifi_state = WIFI_CLIENT;
-  } else if (wifi_state == WIFI_STATE.SERVER) {
+  } else if (get_wifi_state() == WIFI_STATE.SERVER) {
     Serial.println("start wifi server...");
     wifi_set_ap();  // wifi server
     rp.wifi_state = WIFI_SERVOR;
@@ -89,9 +98,21 @@ void wifi_init(void) {
 
   }
 }
+void wifi_restart(void)
+{
+  wifi_restart_flag = true;
+}
 void wifi_loop(void) {
-  static char wifi_status = 0;
+  static char wifi_status_now = 0;
+  static char wifi_status_last = 0;
   static char connect_count_down = 10;
+
+  if(wifi_restart_flag == true)
+  {
+    wifi_status_now = 0;
+    wifi_status_last = 1;
+    WiFi.disconnect(true);  // true = close
+  }
 
   if (wifi_mode != WIFI_STA) return;
 
@@ -102,16 +123,34 @@ void wifi_loop(void) {
       wifi_set_sta();
       connect_count_down = 10;
     }
-    wifi_status = 0;
+    wifi_status_now = 0;
 
   } else  //Print the IP information once when connecting via wifi
   {
     connect_count_down = 1;
-    if (wifi_status == 0) {
+    if (wifi_status_now == 0) {
       // Print the IP address of ESP-01S
       Serial.print("IP Address: ");
       Serial.println(WiFi.localIP());
     }
-    wifi_status = 1;
+    wifi_status_now = 1;
   }
+
+  if(wifi_status_last != wifi_status_now){
+    wifi_status_last = wifi_status_now;
+    StaticJsonDocument<1024> doc;
+    
+    doc["type"]     = "NetWorkChanged";
+    doc["Status"]   = wifi_status_now==true? "connected":"disconnected";
+    doc["IP"]       = WiFi.localIP();
+    doc["Wifi"]     = rp.wifi_info_json[WIFI_INFO_KEY.SSID];
+    doc["Password"] = rp.wifi_info_json[WIFI_INFO_KEY.PASSWORD];
+    ble_tx_add_json(doc);
+  }
+  if(wifi_restart_flag == true)
+  {
+    wifi_restart_flag = false;
+    wifi_init();
+  }
+  
 }

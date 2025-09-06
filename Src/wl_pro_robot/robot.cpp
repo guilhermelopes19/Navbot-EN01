@@ -7,7 +7,7 @@
 #include "SPIFFS.h"
 #include <vector>
 #include "cpu0_task.h"
-
+#include "ble.h"
 int uncontrolable = 0;
 int BAT_PIN = 35;
 esp_adc_cal_characteristics_t adc_chars;
@@ -167,34 +167,47 @@ bool create_and_write_file(const char *filePath, const char *content) {
   }
 }
 void RobotProtocol::save_config_json(void) {
-  Serial.print("save config json :");
-  printDoc(config_json);
+
   char json_arr[CONFIG_JSON_SIZE + 1] = { 0 };
   serializeJson(rp.config_json, json_arr);
-  Serial.println(json_arr);
+
+  //seve data
   eeprom_util.write(&EepromParam.ADDR_JSON, json_arr);
+
+  //read data
+  Serial.print("read config json :");Serial.println(eeprom_util.read(&EepromParam.ADDR_JSON));
+}
+void RobotProtocol::save_wifi_info_json(void) {
+  
+  char json_arr[WIFI_INFO_JSON_SIZE + 1] = { 0 };
+  serializeJson(rp.wifi_info_json, json_arr);
+
+  //seve data
+  eeprom_util.write(&EepromParam.ADDR_WIFI_INFO_JSON, json_arr);
+
+  //read data
+  Serial.print("read wifi info json :");Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_INFO_JSON));
+
 }
 void RobotProtocol::json_is_sys_wifi(StaticJsonDocument<300> &doc) {
-  String ssid = doc["ssid"];
-  String password = doc["password"];
-  String state = doc["state"];
+
+  wifi_info_json[WIFI_INFO_KEY.STATE]     = doc[WIFI_INFO_KEY.STATE];
+  if (doc[WIFI_INFO_KEY.STATE] == WIFI_STATE.CLIENT)
+  {
+    wifi_info_json[WIFI_INFO_KEY.SSID]      = doc[WIFI_INFO_KEY.SSID];
+    wifi_info_json[WIFI_INFO_KEY.PASSWORD]  = doc[WIFI_INFO_KEY.PASSWORD];
+  }
 
   // save data
-  if (state == WIFI_STATE.SERVER || state == WIFI_STATE.CLIENT || state == WIFI_STATE.CLOSE) {
-    eeprom_util.write(&EepromParam.ADDR_WIFI_STATE, state);
-    // read data
-    Serial.print("READ SAVE WIFI STATE:");
-    Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_STATE));
-  }
-  if (state == WIFI_STATE.CLIENT) {
-    eeprom_util.write(&EepromParam.ADDR_WIFI_SSID, ssid);
-    eeprom_util.write(&EepromParam.ADDR_WIFI_PASSWORD, password);
-    // read data
-    Serial.print("READ SAVE WIFI SSID:");
-    Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_SSID));
-    Serial.print("READ SAVE WIFI PASSWORD:");
-    Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_PASSWORD));
-  }
+  String jsonStr;
+  serializeJson(wifi_info_json, jsonStr);
+  eeprom_util.write(&EepromParam.ADDR_WIFI_INFO_JSON, jsonStr);
+
+  // read data
+  Serial.print("READ SAVE WEB SOCKET HOST:");
+  Serial.println(eeprom_util.read(&EepromParam.ADDR_WIFI_INFO_JSON));
+  wifi_restart();
+
 }
 void RobotProtocol::json_is_sys_web_socket_server(StaticJsonDocument<300> &doc) {
   String host = doc["host"];
@@ -443,6 +456,25 @@ void RobotProtocol::config_json_init(void) {
   }
   printDoc(config_json);
 }
+/*
+  当状态发生改变时，通过蓝牙主动发送状态同步给上位机
+  此函数10ms调用一次
+*/
+void RobotProtocol::send_status(void)
+{
+  if(send_status_flag == true && ble_connected == true)
+  {
+    send_status_flag = false;
+    // ble_tx_add_json(status_json);
+  }
+}
+/*
+固定心跳包
+*/
+void RobotProtocol::send_heartbeat(void)
+{
+
+}
 void RobotProtocol::json_test(char *json_arr) {
   Serial.println("json test :");
   Serial.println(json_arr);
@@ -455,6 +487,51 @@ void RobotProtocol::json_test(char *json_arr) {
     parseJson(doc);
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void RobotProtocol::parseBasic(StaticJsonDocument<300> &doc) {
   // printDoc(doc);

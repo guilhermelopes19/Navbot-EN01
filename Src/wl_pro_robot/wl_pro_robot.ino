@@ -160,7 +160,7 @@ void user_function(char* cmd) {
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(2000000);
   Serial2.begin(1000000);
   rp.get_pcb_version();
   rp.config_json_init();

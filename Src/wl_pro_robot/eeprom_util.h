@@ -2,7 +2,7 @@
 
 #include "robot.h"
 
-#define EEPROM_SIZE 1024
+#define EEPROM_SIZE 2048
 
 
 typedef struct EepromObject {
@@ -16,9 +16,10 @@ struct {
   EepromObject ADDR_INFO = { "addr_info", 0, 10 };
 
   // wifi info
-  EepromObject ADDR_WIFI_SSID = { "addr_wifi_ssid", 10, 50 };
-  EepromObject ADDR_WIFI_PASSWORD = { "addr_wifi_password", 60, 30 };
-  EepromObject ADDR_WIFI_STATE = { "addr_wifi_state", 90, 30 };
+  EepromObject ADDR_WIFI_INFO_JSON{"addr_wifi_info_json", 10, 110};
+  // EepromObject ADDR_WIFI_SSID = { "addr_wifi_ssid", 10, 50 };
+  // EepromObject ADDR_WIFI_PASSWORD = { "addr_wifi_password", 60, 30 };
+  // EepromObject ADDR_WIFI_STATE = { "addr_wifi_state", 90, 30 };
 
   // web socket info
   EepromObject ADDR_WEB_SOCKET_HOST = { "addr_web_socket_host", 120, 20 };
