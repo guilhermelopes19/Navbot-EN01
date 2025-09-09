@@ -168,10 +168,10 @@ void setup() {
   ID[1] = 2;
   ACC[0] = 30;
   ACC[1] = 30;
-  Speed[0] = 300;
-  Speed[1] = 300;  
-  Position[0] = 2148;
-  Position[1] = 1948;
+  Speed[0] = 400;//
+  Speed[1] = 400; // 
+  Position[0] = 2048;//
+  Position[1] = 2048;//
   //舵机(ID1/ID2)以最高速度V=2400步/秒，加速度A=50(50*100步/秒^2)，运行至各自的Position位置
   sms_sts.SyncWritePosEx(ID, 2, Position, Speed, ACC);
 
@@ -267,13 +267,13 @@ void loop() {
   motor2.target = (-0.5)*(LQR_u - YAW_output);
 
   //倒地失控后关闭输出
-  if( abs(LQR_angle) > 25.0f  )
+  if( abs(LQR_angle) > 75.0f  )//
   {
     uncontrolable = 1;
   }
-  if( uncontrolable != 0 )//扶起后延时恢复
+  if( uncontrolable != 0 )//扶起后延时恢复 
   {
-    if( abs(LQR_angle) < 10.0f  )
+    if( abs(LQR_angle) < 60.0f  )//
     {
       uncontrolable++;
     }
@@ -399,8 +399,10 @@ void leg_loop(){
     //机身高度自适应控制
     ACC[0] = 8;
     ACC[1] = 8;
-    Speed[0] = 200;
-    Speed[1] = 200;
+    //Speed[0] = 200;
+    //Speed[1] = 200;
+     Speed[0] = 300;//777777777777
+     Speed[1] = 300;//
     float roll_angle  = (float)mpu6050.getAngleX() + 2.0;
     //leg_position_add += pid_roll_angle(roll_angle);
     leg_position_add = pid_roll_angle(lpf_roll(roll_angle));//test
