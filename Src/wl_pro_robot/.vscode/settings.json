@@ -1,3 +1,4 @@
 {
-    "C_Cpp.errorSquiggles": "disabled"
+    "C_Cpp.errorSquiggles": "disabled",
+    "cmake.sourceDirectory": "C:/Users/Administrator/Documents/GitHub/Navbot-EN01/Src/wl_pro_robot/libraries/ArduinoJson"
 }

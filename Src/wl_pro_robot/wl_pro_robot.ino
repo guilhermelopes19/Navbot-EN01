@@ -19,8 +19,7 @@
 #include "eeprom_util.h"
 #include "feedback_util.h"
 #include "web_socket_client_util.h"
-
-
+ 
 #include "cpu0_task.h"
 
 /************Instance definition*************/
@@ -38,22 +37,22 @@ MagneticSensorI2C sensor1 = MagneticSensorI2C(AS5600_I2C);
 MagneticSensorI2C sensor2 = MagneticSensorI2C(AS5600_I2C);
 
 //PID instance
-PIDController pid_angle         { .P = 1, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_gyro          { .P = 0.06, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_distance      { .P = 0.5, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_speed         { .P = 0.7, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_yaw_angle     { .P = 1.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_yaw_gyro      { .P = 0.04, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_lqr_u         { .P = 1, .I = 15, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_zeropoint     { .P = 0.002, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
-PIDController pid_roll_angle    { .P = 8, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };
+PIDController pid_angle{ .P = 1, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_gyro{ .P = 0.06, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_distance{ .P = 0.5, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_speed{ .P = 0.7, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_yaw_angle{ .P = 1.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_yaw_gyro{ .P = 0.04, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_lqr_u{ .P = 1, .I = 15, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_zeropoint{ .P = 0.002, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
+PIDController pid_roll_angle{ .P = 8, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };
 
 //Low pass filter instance
 LowPassFilter lpf_joyy{ .Tf = 0.2 };
 LowPassFilter lpf_zeropoint{ .Tf = 0.1 };
 LowPassFilter lpf_roll{ .Tf = 0.3 };
 
-// Commander communicate instance
+// Commander instance
 Commander command = Commander(Serial);
 
 void StabAngle(char* cmd) {
@@ -145,9 +144,9 @@ int jump_flag = 0;              //Jump period identification
 float leg_position_add = 0;     //roll axis balance control quantity
 
 //Voltage detection
-uint16_t bat_check_num = 0;
+
 static const adc1_channel_t channel = ADC1_CHANNEL_7;
-static const adc_bits_width_t width = ADC_WIDTH_BIT_12;
+// static const adc_bits_width_t width = ADC_WIDTH_BIT_12;
 static const adc_atten_t atten = ADC_ATTEN_DB_11;
 static const adc_unit_t unit = ADC_UNIT_1;
 
@@ -155,50 +154,18 @@ static const adc_unit_t unit = ADC_UNIT_1;
 #define LED_BAT 13
 
 void user_function(char* cmd) {
-  switch(*cmd)
-  {
-    case '1':
-    {
-      Serial.println("off all servo");
-      sms_sts.off_all_servo();
-    }break;
-    case '2':
-    {
-      Serial.println("on all servo");
-      sms_sts.on_all_servo();
-    }break;
-    case '3':
-    {
-      Serial.println("calibrate all servo");
-      sms_sts.calibrate_all_servo();
-    }break;
-    // case '4':
-    // {
-    //   Serial.println("set servo id 2");
-    //   sms_sts.set_servo_id(1,2);
-    // }break;
-    // case '5':
-    // {
-    //   Serial.println("set servo id 1");
-    //   sms_sts.set_servo_id(2,1);
-    // }break;
-
+  if (*cmd == '{') {
+    rp.json_test(cmd);
   }
 }
 
 void setup() {
-
-  // ble_test();
-
-  // delay(3000);
-  Serial.begin(115200);
+  Serial.begin(2000000);
   Serial2.begin(1000000);
   rp.get_pcb_version();
-  xTaskCreatePinnedToCore(cpu0_task, "cpu0_task", 1024 * 4, NULL, 0, NULL, 0);
-
+  rp.config_json_init();
   ble_init();
   wifi_init();
-
   if (get_wifi_state() != WIFI_STATE.CLOSE) {
     webserver.begin();
     webserver.on("/", HTTP_GET, basicWebCallback);
@@ -207,6 +174,8 @@ void setup() {
   }
 
   web_sockets_client_init();
+
+  xTaskCreatePinnedToCore(cpu0_task, "cpu0_task", 2048, NULL, 0, NULL, 0);
 
   //Steering gear initialization
   //Steering gear effective stroke 450
@@ -219,17 +188,17 @@ void setup() {
   ACC[1] = 30;
   Speed[0] = 300;
   Speed[1] = 300;
-  Position[0] =2048;
-  Position[1] =2048;
+  Position[0] = 2048;
+  Position[1] = 2048;
   //The steering gear (ID1/ID2) runs to their respective positions at maximum speed V=2400 steps/SEC and \
   acceleration A=50(50*100 steps/SEC ^2)
   sms_sts.SyncWritePosEx(ID, 2, Position, Speed, ACC);
 
   //Voltage detection
   adc_calibration_init();
-  adc1_config_width(width);
+  adc1_config_width(ADC_WIDTH_BIT_12);
   adc1_config_channel_atten(channel, atten);
-  esp_adc_cal_characterize(unit, atten, width, 0, &adc_chars);
+  esp_adc_cal_characterize(unit, atten, ADC_WIDTH_BIT_12, 0, &adc_chars);
 
   //Voltage detection LED
   pinMode(LED_BAT, OUTPUT);
@@ -299,9 +268,6 @@ void setup() {
   command.add('U', user_function, "user function");
 
   //command.add('M', Stabtest_zeropoint, "test_zeropoint");
-
-
-
   delay(500);
 }
 
@@ -310,13 +276,16 @@ void loop() {
   if (one_second_tick()) {
     bat_check();  //Voltage detection
     wifi_loop();
+    static int ttss;
+    Serial.println(ttss++);
   }
-  if(ten_msec_tick()){
+  if (ten_msec_tick()) {
     ble_loop();
+    // show_expression_time_callback(10);
   }
 
   web_loop();  //Web data update
-  
+
   mpu6050.update();    //IMU data update
   lqr_balance_loop();  //lqr self-balancing control
   yaw_loop();          //yaw axis steering control
@@ -327,12 +296,12 @@ void loop() {
   motor2.target = (-0.5) * (LQR_u - YAW_output);
 
   //Shut down output after falling out of control
-  if (abs(LQR_angle) > 25.0f) {
+  if (abs(LQR_angle) > 45.0f) {
     uncontrolable = 1;
   }
   if (uncontrolable != 0)  //Delay recovery after lifting
   {
-    if (abs(LQR_angle) < 10.0f) {
+    if (abs(LQR_angle) < 25.0f) {
       uncontrolable++;
     }
     if (uncontrolable > 200)  //The delay time of 200 program cycles
@@ -464,8 +433,8 @@ void leg_loop() {
     float roll_angle = (float)mpu6050.getAngleX() + 2.0 + rp.offset_roll;
     // leg_position_add += pid_roll_angle(roll_angle);
     leg_position_add = pid_roll_angle(lpf_roll(roll_angle));  //test
-    Position[0] = 2048  + 8.4 * (wrobot.height - 32) - leg_position_add;
-    Position[1] = 2048  - 8.4 * (wrobot.height - 32) - leg_position_add;
+    Position[0] = 2048 + 8.4 * (wrobot.height - 32) - leg_position_add;
+    Position[1] = 2048 - 8.4 * (wrobot.height - 32) - leg_position_add;
     if (Position[0] < 2110)
       Position[0] = 2110;
     else if (Position[0] > 2510)
@@ -532,7 +501,6 @@ void web_loop() {
 //The yaw axis Angle accumulation function
 void yaw_angle_addup() {
   YAW_angle = (float)mpu6050.getAngleZ();
-  ;
   YAW_gyro = (float)mpu6050.getGyroZ();
 
   if (YAW_angle_zero_point == (-10)) {
@@ -574,31 +542,6 @@ void webSocketEventCallback(uint8_t num, WStype_t type, uint8_t* payload, size_t
     }
   }
 }
-
-void webSocketClientEventCallback(WStype_t type, uint8_t* payload, size_t length) {
-  switch (type) {
-    case WStype_DISCONNECTED:
-      printf("WEB SOCKET CLIENT:DISCONNECTED\n");
-      break;
-
-    case WStype_CONNECTED:
-      printf("WEB SOCKET CLIENT:CONNECTED\n");
-      break;
-  }
-
-  if (type == WStype_TEXT) {
-    String payload_str = String((char*)payload);
-    StaticJsonDocument<300> doc;
-    DeserializationError error = deserializeJson(doc, payload_str);
-
-    printf("eFuse Two Point: Supported\n");
-    String mode_str = doc["mode"];
-    if (mode_str == "basic") {
-      rp.parseBasic(doc);
-    }
-  }
-}
-
 //Voltage detection initialization
 void adc_calibration_init() {
   if (esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_TP) == ESP_OK) {
@@ -616,7 +559,8 @@ void adc_calibration_init() {
 
 //Voltage detection
 void bat_check() {
-  if (bat_check_num > 10) {
+  static uint16_t bat_check_num = 2;
+  if (bat_check_num > 2) {
     //Voltage reading
     uint32_t sum = 0;
     sum = analogRead(BAT_PIN);
@@ -625,22 +569,34 @@ void bat_check() {
 
     Serial.println(rp.battery_voltage);
     //Battery display
-    if (rp.battery_voltage > 7.8)
-      digitalWrite(LED_BAT, HIGH);
-    else
-      digitalWrite(LED_BAT, LOW);
-
     bat_check_num = 0;
   } else
+  {
     bat_check_num++;
+  }
+  if (rp.battery_voltage > 7.4)
+  {
+    digitalWrite(LED_BAT, HIGH);
+  }
+  else if(rp.battery_voltage > 5)
+  {
+    static uint8_t toggle;
+    toggle = !toggle;
+    digitalWrite(LED_BAT, toggle);
+  }
+  else 
+  {
+    digitalWrite(LED_BAT, LOW);
+  }
+   
 }
 
 //Generate a one-second tick
 bool one_second_tick(void) {
   static unsigned long lastMillis = 0;
   unsigned long currentMillis = millis();
-
-  if (currentMillis - lastMillis >= 5000) {
+ 
+  if (currentMillis - lastMillis >= 1000) {
     lastMillis = currentMillis;
     return 1;
   }

@@ -8,9 +8,9 @@
 
 
 struct {
-    int ALL = 0;
-    int BLE = 1;
-    int WEB_SOCKET_CLIENT = 2;
+  int ALL = 0;
+  int BLE = 1;
+  int WEB_SOCKET_CLIENT = 2;
 } FEEDBACK_CHANNEL;
 
 
