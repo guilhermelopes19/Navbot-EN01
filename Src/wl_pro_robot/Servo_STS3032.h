@@ -82,6 +82,9 @@ protected:
   u8 servo_sw = 1;
 
 public:
+
+  bool servo_off = false;
+
   virtual void SyncWritePosEx(u8 ID[], u8 IDN, s16 Position[], u16 Speed[], u8 ACC[]);  //Write multiple servo position instructions simultaneously
   void off_all_servo(void);
   void on_all_servo(void);

@@ -372,19 +372,24 @@ void set_setvo_id1()
   sms_sts.set_servo_eeprom_lock(2,0);
   delay(2);
   sms_sts.set_servo_id(2,1);
-  // delay(2);
-  // sms_sts.set_servo_eeprom_lock(1,1);
+  delay(2);
+  sms_sts.set_servo_eeprom_lock(1,1);
 }
 void set_setvo_id2()
 {
   sms_sts.set_servo_eeprom_lock(1,0);
   delay(2);
   sms_sts.set_servo_id(1,2);
-  // delay(2);
-  // sms_sts.set_servo_eeprom_lock(2,1);
+  delay(2);
+  sms_sts.set_servo_eeprom_lock(2,1);
 }
 void RobotProtocol::calibrate_servo(void)
 {
+  if(sms_sts.servo_off == false)
+  {
+    Serial.println("Please turn off the servo first.");
+    return;
+  }
   sms_sts.calibrate_all_servo();
   delay(2);
   sms_sts.on_all_servo();
