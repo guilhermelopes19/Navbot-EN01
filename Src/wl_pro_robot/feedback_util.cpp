@@ -67,7 +67,8 @@ String get_device_info() {
   // doc["main"] = "1.0.0.0";
   // doc["GPS"] = "--";
   doc["mac"] = get_dev_mac();
-
+  doc["recovery_angle"] = rp.recovery_angle;
+  doc["uncontrollable_angle"] = rp.uncontrollable_angle;
   serializeJson(doc, jsonStr);
   return jsonStr;
 }

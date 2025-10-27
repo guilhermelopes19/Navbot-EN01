@@ -9,8 +9,8 @@
 #include "cpu0_task.h"
 #include "ble.h"
 #include "web_socket_client_util.h"
+#include <MPU6050_tockn.h>
 
-int uncontrolable = 0;
 int BAT_PIN = 35;
 esp_adc_cal_characteristics_t adc_chars;
 Wrobot wrobot;
@@ -49,12 +49,6 @@ void RobotProtocol::spinOnce(void) {
     //        Serial.printf("joy_Y:%d\n", wrobot.joyy);
   }
 }
-
-
-
-
-
-
 
 
 
@@ -137,11 +131,11 @@ double RobotProtocol::get_battery_level() {
 int RobotProtocol::get_robot_status() {
   // 0 - Normal state, 1 - Primary out-of-control state (tilting), 2 - Recovery waiting state
   int robot_status = -1;
-  if (uncontrolable == 0) {
+  if (uncontrollable == 0) {
     robot_status = 0;
-  } else if (uncontrolable == 1) {
+  } else if (uncontrollable == 1) {
     robot_status = 1;
-  } else if (uncontrolable > 1) {
+  } else if (uncontrollable > 1) {
     robot_status = 2;
   }
   return robot_status;
@@ -394,6 +388,60 @@ void RobotProtocol::calibrate_servo(void)
   delay(2);
   sms_sts.on_all_servo();
 }
+void RobotProtocol::set_test_number(StaticJsonDocument<300> &doc)
+{
+  if (doc["value"].isNull() == true) {
+    test_number = 0;
+  } else {
+    test_number = (uint8_t)doc["value"];
+  }
+}
+void RobotProtocol::set_uncontrollable_angle(StaticJsonDocument<300> &doc)
+{
+  if (doc["angle"].isNull() == true) {
+    
+  } else {
+    uncontrollable_angle = doc["angle"];
+    config_json["uncontrollable_angle"] = uncontrollable_angle;
+    save_config_json();
+  }
+}
+
+void RobotProtocol::set_recovery_angle(StaticJsonDocument<300> &doc)
+{
+  if (doc["angle"].isNull() == true) {
+    
+  } else {
+    recovery_angle = doc["angle"];
+    config_json["recovery_angle"] = recovery_angle;
+    save_config_json();
+  }
+}
+void RobotProtocol::test_log_output()
+{
+  switch(test_number)
+  {
+    case 1:
+    {
+      extern MPU6050 mpu6050;
+      float x = mpu6050.getAngleX();
+      float y = mpu6050.getAngleY();
+      float z = mpu6050.getAngleZ();
+
+      Serial.print("x:");
+      Serial.print(x);
+
+      Serial.print(" y:");
+      Serial.print(y);
+
+      Serial.print(" z:");
+      Serial.print(z);
+
+      Serial.println("");
+
+    }break;
+  }
+}
 void RobotProtocol::isSys(StaticJsonDocument<300> &doc) {
   String type = doc["type"];
   Serial.print("type:");
@@ -422,11 +470,17 @@ void RobotProtocol::isSys(StaticJsonDocument<300> &doc) {
   } else if (type == MESSAGE_TYPE.SHOW_EXPRESSION) {
     json_is_sys_show_expression(doc);
   } else if (type == MESSAGE_TYPE.GET_EXPRESSION) {
-    json_is_sys_send_expression(FEEDBACK_CHANNEL.ALL);
+    json_is_sys_send_expression(FEEDBACK_CHANNEL.ALL); 
   } else if (type == MESSAGE_TYPE.SET_CLOUD_TOKEN) {
     json_is_sys_set_cloud_token(doc);
   } else if (type == MESSAGE_TYPE.SET_OPENAI_TOKEN) {
     json_is_sys_set_openai_token(doc);
+  } else if (type == MESSAGE_TYPE.SET_TEST_NUMBER) {
+    set_test_number(doc);
+  } else if (type == MESSAGE_TYPE.SET_UNCONTROLLABLE_ANGLE) {
+    set_uncontrollable_angle(doc);
+  } else if (type == MESSAGE_TYPE.SET_RECOVERY_ANGLE) {
+    set_recovery_angle(doc);
   } else {
     Serial.println("Invalid json keyworeds.\r\n");
   }
@@ -467,17 +521,43 @@ void RobotProtocol::build_dev_name(char dev_name[]) {
   sprintf(dev_name, "%s%s", basc, mac);
 }
 void RobotProtocol::config_json_init(void) {
+  
+  bool need_save = false;
+
   eeprom_util.init();
   String json_str = eeprom_util.read(&EepromParam.ADDR_JSON);
   DeserializationError error = deserializeJson(config_json, json_str);
+  config_json.clear();
+  save_config_json();
   if (error) {
     Serial.println("The file was not found 'config.json'.");
+    config_json.clear();
+    save_config_json();
+  }
+
+  if(config_json["name"].isNull()==true){
     char name[20];
     build_dev_name(name);
     String name_str = name;
     config_json["name"] = name_str;
+    need_save = true;
+  }
+  if(config_json["recovery_angle"].isNull()==true){
+    config_json["recovery_angle"] = recovery_angle;
+    need_save = true;
+  }
+  if(config_json["uncontrollable_angle"].isNull()==true){
+    config_json["uncontrollable_angle"] = uncontrollable_angle;
+    need_save = true;
+  }
+  if(need_save == true){
     save_config_json();
   }
+
+
+
+  recovery_angle = config_json["recovery_angle"];
+  uncontrollable_angle = config_json["uncontrollable_angle"];
   printDoc(config_json);
 }
 /*
@@ -511,41 +591,6 @@ void RobotProtocol::json_test(char *json_arr) {
     parseJson(doc);
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -632,7 +677,11 @@ void RobotProtocol::parseBasic(StaticJsonDocument<300> &doc) {
   int stable = doc["stable"];
   wrobot.go = stable;
   if (stable) {
+    if(_now_buf[11]==0)
+      rp.uncontrollable = 0;
+    
     _now_buf[11] = 1;
+    
   } else {
     _now_buf[11] = 0;
   }
