@@ -92,8 +92,8 @@ void lpfRoll(char* cmd) {
   command.lpf(&lpf_roll, cmd);
 }
 
-bool one_second_tick(void);
-bool ten_msec_tick(void);
+bool sitdown_falg = false;
+
 //void Stabtest_zeropoint(char* cmd) { command.pid(&test_zeropoint, cmd); }
 
 //WebServer instance
@@ -282,7 +282,6 @@ void loop() {
   if (ten_msec_tick()) {
     ble_loop();
     rp.test_log_output();
-    // show_expression_time_callback(10);
   }
 
   web_loop();  //Web data update
@@ -314,15 +313,23 @@ void loop() {
     }
   }
 
+  
+  if(wrobot.go == 0){
+    robot_sitdown();
+  }else{
+    sitdown_falg = false;
+  }
+
   //Turn off output (remote control stop or Angle is too large out of control)
-  if (wrobot.go == 0 || rp.uncontrollable != 0) {
+  if (rp.uncontrollable != 0) {
+    sitdown_falg = true;
     motor1.target = 0;
     motor2.target = 0;
     leg_position_add = 0;
     wrobot.joyx = 0;
     wrobot.joyy = 0;
     wrobot.roll = 0;
-    wrobot.height = 34;
+    wrobot.height = 32;
   }
 
   //Record the last remote control data
@@ -355,11 +362,6 @@ void lqr_balance_loop() {
   LQR_speed = (-0.5) * (motor1.shaft_velocity + motor2.shaft_velocity);
   LQR_angle = (float)mpu6050.getAngleY();
   LQR_gyro = (float)mpu6050.getGyroY();
-  //Serial.println(LQR_distance);
-  // Serial.println(LQR_angle);
-  // Serial.print("-->");
-  // Serial.println(angle_control);
-  //Calculate self-balancing output
   angle_control = pid_angle(LQR_angle - angle_zeropoint);
   gyro_control = pid_gyro(LQR_gyro);
 
@@ -412,7 +414,6 @@ void lqr_balance_loop() {
   if (abs(LQR_u) < 5 && wrobot.joyy == 0 && abs(distance_control) < 4 && (jump_flag == 0)) {
 
     LQR_u = pid_lqr_u(LQR_u);  //Compensate for the nonlinearity of small torque
-    //Serial.println(LQR_u);
     angle_zeropoint -= pid_zeropoint(lpf_zeropoint(distance_control));  //Center of gravity adaptive
   } else {
     pid_lqr_u.error_prev = 0;  //The output integral is reset to zero
@@ -427,7 +428,31 @@ void lqr_balance_loop() {
     pid_speed.P = 0.5;
   }
 }
-
+void robot_sitdown()
+{
+  if(rp.uncontrollable != 0)
+  { 
+    return;
+  }
+  
+  float _angle = LQR_angle - angle_zeropoint;
+  //当前没有坐下，调整角度
+  if(  _angle > (-1) && sitdown_falg == false )
+  {
+    wrobot.joyy = -100;
+  }
+  //此时身体已经为后仰，可以关闭动力，然后自然坐下
+  else{
+    sitdown_falg = true;
+    motor1.target = 0;
+    motor2.target = 0;
+    leg_position_add = 0;
+    wrobot.joyx = 0;
+    wrobot.joyy = 0;
+    wrobot.roll = 0;
+    wrobot.height = 32;
+  }
+}
 //Leg movement control
 void leg_loop() {
   jump_loop();
@@ -605,7 +630,6 @@ void bat_check() {
   {
     digitalWrite(LED_BAT, LOW);
   }
-   
 }
 
 //Generate a one-second tick
