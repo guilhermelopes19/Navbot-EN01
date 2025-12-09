@@ -116,6 +116,8 @@ public:
   int uncontrollable = 0;   //Too much tilt and loss of control
   float uncontrollable_angle = 35.0f;
   float recovery_angle      = 15.0f;
+  float m1_direction;
+  float m2_direction;
 
   bool charge = false;
   bool socket_connected = false;

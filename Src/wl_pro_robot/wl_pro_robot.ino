@@ -172,6 +172,7 @@ void setup() {
     websocket.begin();
     websocket.onEvent(webSocketEventCallback);
   }
+  
 
   web_sockets_client_init();
 
@@ -252,6 +253,12 @@ void setup() {
   motor2.init();
   motor2.initFOC();
 
+  rp.m1_direction = motor1.sensor_direction == CW?  -0.5 : 0.5;
+  rp.m2_direction = motor2.sensor_direction == CCW? -0.5 : 0.5;
+
+  Serial.println("Motor1 direction:" + String(rp.m1_direction));
+  Serial.println("Motor2 direction:" + String(rp.m2_direction));
+  
   // Map motor to commander
   command.add('A', StabAngle, "pid angle");
   command.add('B', StabGyro, "pid gyro");
@@ -267,6 +274,7 @@ void setup() {
   command.add('L', lpfRoll, "lpf roll");
   command.add('U', user_function, "user function");
 
+
   //command.add('M', Stabtest_zeropoint, "test_zeropoint");
   delay(500);
 }
@@ -281,7 +289,9 @@ void loop() {
   }
   if (ten_msec_tick()) {
     ble_loop();
+    bat_led_blink();  //Voltage indication LED light
     rp.test_log_output();
+
   }
 
   web_loop();  //Web data update
@@ -292,8 +302,10 @@ void loop() {
   leg_loop();          //Leg motion control
 
   //The self-balancing calculated output torque is assigned to the motor
-  motor1.target = (-0.5) * (LQR_u + YAW_output);
-  motor2.target = (-0.5) * (LQR_u - YAW_output);
+  // motor1.target = (-0.5) * (LQR_u + YAW_output) * rp.m1_direction;
+  // motor2.target = (-0.5) * (LQR_u - YAW_output) * rp.m2_direction;
+  motor1.target = (LQR_u + YAW_output) * rp.m1_direction;
+  motor2.target = (LQR_u - YAW_output) * rp.m2_direction;
  
 
 
@@ -358,8 +370,9 @@ void lqr_balance_loop() {
   //QR_u = LQR_k1*(LQR_angle - angle_zeropoint) + LQR_k2*LQR_gyro + LQR_k3*(LQR_distance - distance_zeropoint) + LQR_k4*LQR_speed;
 
   //The negative value is given because, according to the current motor wiring, the positive torque will turn backwards
-  LQR_distance = (-0.5) * (motor1.shaft_angle + motor2.shaft_angle);
-  LQR_speed = (-0.5) * (motor1.shaft_velocity + motor2.shaft_velocity);
+  LQR_distance = motor1.shaft_angle*rp.m1_direction  + motor2.shaft_angle*rp.m2_direction;
+  LQR_speed    = motor1.shaft_velocity*rp.m1_direction  + motor2.shaft_velocity*rp.m2_direction;
+
   LQR_angle = (float)mpu6050.getAngleY();
   LQR_gyro = (float)mpu6050.getGyroY();
   angle_control = pid_angle(LQR_angle - angle_zeropoint);
@@ -616,19 +629,86 @@ void bat_check() {
   {
     bat_check_num++;
   }
-  if (rp.battery_voltage > 7.4)
-  {
-    digitalWrite(LED_BAT, HIGH);
+}
+void bat_led_blink() {
+  // Blink pattern:
+  // - voltage <= 7.2V : LED off (insufficient)
+  // - voltage > 8.0V  : 5 blinks (full)
+  // - 7.2V < voltage <= 8.0V : linear map to 1..4 blinks
+  // Sequence: short on/off blinks (200ms on, 200ms off) repeated N times, then pause between sequences.
+  static uint8_t target_blinks = 0;       // how many blinks to emit in the next sequence
+  static uint8_t blink_index = 0;         // current blink number in the running sequence
+  static bool in_sequence = false;        // are we currently emitting a sequence
+  static bool led_on = false;             // current LED state within sequence
+  static unsigned long last_ts = 0;       // last timestamp for toggle
+  static unsigned long seq_pause_ts = 0;  // timestamp when sequence finished (for pause timing)
+
+  const unsigned long blink_on_ms = 200;
+  const unsigned long blink_off_ms = 200;
+  const unsigned long pause_between_sequences_ms = 1500;
+
+  // determine target_blinks from voltage
+  float v = rp.battery_voltage;
+  if (v <= 7.2f) {
+    target_blinks = 0; // off
+  } else if (v > 8.0f) {
+    target_blinks = 5; // full
+  } else {
+    float ratio = (v - 7.2f) / (8.0f - 7.2f); // 0..1
+    // map ratio to 1..4
+    uint8_t mapped = 1 + (uint8_t)(ratio * 4.0f);
+    if (mapped > 4) mapped = 4;
+    target_blinks = mapped;
   }
-  else if(rp.battery_voltage > 0.5)
-  {
-    static uint8_t toggle;
-    toggle = !toggle;
-    digitalWrite(LED_BAT, toggle);
-  }
-  else 
-  {
+
+  unsigned long now = millis();
+
+  // if no blinks required, ensure LED off and reset state
+  if (target_blinks == 0) {
     digitalWrite(LED_BAT, LOW);
+    in_sequence = false;
+    blink_index = 0;
+    led_on = false;
+    seq_pause_ts = now;
+    return;
+  }
+
+  // If not in sequence, wait for pause then start
+  if (!in_sequence) {
+    if (now - seq_pause_ts >= pause_between_sequences_ms) {
+      in_sequence = true;
+      blink_index = 0;
+      led_on = false;
+      last_ts = now;
+    } else {
+      digitalWrite(LED_BAT, LOW);
+      return;
+    }
+  }
+
+  // In sequence: toggle LED according to durations
+  if (!led_on) {
+    // currently off; time to turn on for next blink?
+    if (now - last_ts >= blink_off_ms) {
+      // start ON period
+      digitalWrite(LED_BAT, HIGH);
+      led_on = true;
+      last_ts = now;
+    }
+  } else {
+    // currently on; check if ON period elapsed
+    if (now - last_ts >= blink_on_ms) {
+      digitalWrite(LED_BAT, LOW);
+      led_on = false;
+      last_ts = now;
+      blink_index++;
+      if (blink_index >= target_blinks) {
+        // finished sequence
+        in_sequence = false;
+        seq_pause_ts = now;
+        blink_index = 0;
+      }
+    }
   }
 }
 
