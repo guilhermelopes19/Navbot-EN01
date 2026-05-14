@@ -1,15 +1,17 @@
 //Robot controlled header file
-#include <MPU6050_tockn.h>
-//#include "Servo_STS3032.h"
 #include <SimpleFOC.h>
 #include <Arduino.h>
+//#include <MPU6050_tockn.h>
+// #include "Servo_STS3032.h"
+#include <MPU9250_asukiaaa.h>
+#include <BitBang_I2C.h>
 
 //WiFi transmission header file
 #include <WebSocketsServer.h>
 #include <ArduinoJson.h>
 #include <WebServer.h>
 #include <WiFi.h>
-//#include <FS.h>
+#include <FS.h>
 #include "basic_web.h"
 #include "robot.h"
 #include "wifi_robot.h"
@@ -21,6 +23,9 @@
 #include "web_socket_client_util.h"
  
 //#include "cpu0_task.h"
+
+#define SERVOMIN 75
+#define SERVOMAX 550
 
 /************Instance definition*************/
 
@@ -38,6 +43,7 @@ void bat_check();
 void bat_led_blink();
 bool one_second_tick(void);
 bool ten_msec_tick(void);
+uint16_t angleToPulse(int ang);
 
 //Electromotor instance
 BLDCMotor motor1 = BLDCMotor(7);
@@ -52,10 +58,10 @@ MagneticSensorI2C sensor1 = MagneticSensorI2C(AS5600_I2C);
 MagneticSensorI2C sensor2 = MagneticSensorI2C(AS5600_I2C);
 
 //PID instance
-PIDController pid_angle{ .P = 1, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_gyro{ .P = 0.06, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_distance{ .P = 0.5, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_speed{ .P = 0.7, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_angle{ .P = 50, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_gyro{ .P = 2.2, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_distance{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_speed{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_yaw_angle{ .P = 1.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_yaw_gyro{ .P = 0.04, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_lqr_u{ .P = 1, .I = 15, .D = 0, .ramp = 100000, .limit = 8 };
@@ -116,8 +122,50 @@ WebServer webserver;                                // server
 WebSocketsServer websocket = WebSocketsServer(81);  // Define a webSocket server to process messages sent by clients
 int joystick_value[2];
 
-//MPU6050 instance
-MPU6050 mpu6050(I2Ctwo);
+// MPU9250 instance
+MPU9250_asukiaaa mpu9250;
+
+BBI2C bbi2c; 
+
+// Função que configura o PCA9685 manualmente nos pinos 21 e 4
+void inicializarPCA9685() {
+  // 1. Configura os pinos do I2C
+  memset(&bbi2c, 0, sizeof(bbi2c));
+  bbi2c.bWire = 0; // 0 significa usar os pinos digitais (BitBang)
+  bbi2c.iSDA = 21; // Seu pino SDA
+  bbi2c.iSCL = 4;  // Seu pino SCL
+  I2CInit(&bbi2c, 100000); // Velocidade de 100kHz
+
+  // 2. Configura o PCA9685 para servos (50Hz)
+  uint8_t sleep_cmd[2] = {0x00, 0x10}; // Coloca o chip em sleep para mudar a frequência
+  I2CWrite(&bbi2c, 0x40, sleep_cmd, 2);
+
+  uint8_t prescale_cmd[2] = {0xFE, 121}; // Define a frequência para ~50Hz
+  I2CWrite(&bbi2c, 0x40, prescale_cmd, 2);
+
+  uint8_t wake_cmd[2] = {0x00, 0x00}; // Acorda o chip
+  I2CWrite(&bbi2c, 0x40, wake_cmd, 2);
+  delay(5);
+
+  uint8_t mode_cmd[2] = {0x00, 0xA1}; // Liga o Auto-Incremento para escrita rápida
+  I2CWrite(&bbi2c, 0x40, mode_cmd, 2);
+}
+
+// Função que substitui a 'board1.setPWM' da Adafruit
+void setPWM_Software(uint8_t servo_num, uint16_t pulse) {
+  uint8_t base_reg = 0x06 + (4 * servo_num); // Descobre o registrador do motor desejado
+  
+  // Monta o pacote de dados (inicia em 0, termina no valor do pulso)
+  uint8_t data[5];
+  data[0] = base_reg;
+  data[1] = 0x00;                 // Tempo ON LSB
+  data[2] = 0x00;                 // Tempo ON MSB
+  data[3] = pulse & 0xFF;         // Tempo OFF LSB
+  data[4] = (pulse >> 8) & 0xFF;  // Tempo OFF MSB
+  
+  // Envia via I2C de Software
+  I2CWrite(&bbi2c, 0x40, data, 5);
+}
 
 /************parameter definition*************/
 #define pi 3.1415927
@@ -132,7 +180,7 @@ float gyro_control = 0;
 float speed_control = 0;
 float distance_control = 0;
 float LQR_u = 0;
-float angle_zeropoint = 4.02;
+float angle_zeropoint = -0.03;
 float distance_zeropoint = -256.0;  //Wheel position shift zero offset \
  (-256 is an impossible displacement value, use it as a sign that it is not refreshed)
 
@@ -225,9 +273,12 @@ void setup() {
   sensor1.init(&I2Cone);
   sensor2.init(&I2Ctwo);
 
-  //mpu6050 setup
-  mpu6050.begin();
-  mpu6050.calcGyroOffsets(true);
+  // ==========================================
+  // MPU9250 setup & Calibração Manual
+  // ==========================================
+  mpu9250.setWire(&I2Ctwo);
+  mpu9250.calibrate();
+  // ==========================================
 
   //Connect the motor object to the encoder object
   motor1.linkSensor(&sensor1);
@@ -273,6 +324,9 @@ void setup() {
 
   Serial.println("Motor1 direction:" + String(rp.m1_direction));
   Serial.println("Motor2 direction:" + String(rp.m2_direction));
+
+  // Setup pca9685
+  inicializarPCA9685();
   
   // Map motor to commander
   command.add('A', StabAngle, "pid angle");
@@ -289,6 +343,7 @@ void setup() {
   command.add('L', lpfRoll, "lpf roll");
   command.add('U', user_function, "user function");
 
+  leg_loop(); 
 
   //command.add('M', Stabtest_zeropoint, "test_zeropoint");
   delay(500);
@@ -306,23 +361,22 @@ void loop() {
     ble_loop();
     bat_led_blink();  //Voltage indication LED light
     rp.test_log_output();
-
+    
   }
 
   web_loop();  //Web data update
 
-  mpu6050.update();    //IMU data update
+  mpu9250.updateMPU();    //IMU data update
   lqr_balance_loop();  //lqr self-balancing control
   yaw_loop();          //yaw axis steering control
-  leg_loop();          //Leg motion control
 
   //The self-balancing calculated output torque is assigned to the motor
-  // motor1.target = (-0.5) * (LQR_u + YAW_output) * rp.m1_direction;
-  // motor2.target = (-0.5) * (LQR_u - YAW_output) * rp.m2_direction;
-  motor1.target = (LQR_u + YAW_output) * rp.m1_direction;
-  motor2.target = (LQR_u - YAW_output) * rp.m2_direction;
+  motor1.target = (-0.5) * (LQR_u + YAW_output) * rp.m1_direction;
+  motor2.target = (-0.5) * (LQR_u - YAW_output) * rp.m2_direction;
+  //motor1.target = (LQR_u + YAW_output) * rp.m1_direction;
+  //motor2.target = (LQR_u - YAW_output) * rp.m2_direction;
  
-
+  
 
   //Shut down output after falling out of control
   
@@ -342,7 +396,7 @@ void loop() {
 
   
   if(wrobot.go == 0){
-    robot_sitdown();
+    //robot_sitdown();
   }else{
     sitdown_falg = false;
   }
@@ -385,11 +439,17 @@ void lqr_balance_loop() {
   //QR_u = LQR_k1*(LQR_angle - angle_zeropoint) + LQR_k2*LQR_gyro + LQR_k3*(LQR_distance - distance_zeropoint) + LQR_k4*LQR_speed;
 
   //The negative value is given because, according to the current motor wiring, the positive torque will turn backwards
-  LQR_distance = motor1.shaft_angle*rp.m1_direction  + motor2.shaft_angle*rp.m2_direction;
-  LQR_speed    = motor1.shaft_velocity*rp.m1_direction  + motor2.shaft_velocity*rp.m2_direction;
+  LQR_distance = -(motor1.shaft_angle * rp.m1_direction + motor2.shaft_angle * rp.m2_direction);
+  LQR_speed    = -(motor1.shaft_velocity * rp.m1_direction + motor2.shaft_velocity * rp.m2_direction);
 
-  LQR_angle = (float)mpu6050.getAngleY();
-  LQR_gyro = (float)mpu6050.getGyroY();
+  // PATCH A: inicializa distance_zeropoint no primeiro ciclo real
+  if (distance_zeropoint < -200.0f) {
+      distance_zeropoint = LQR_distance;
+      return; // pula este ciclo para não gerar spike
+  }
+
+  LQR_angle = mpu9250.getAngleY();
+  LQR_gyro = mpu9250.getGyroYRads();
   angle_control = pid_angle(LQR_angle - angle_zeropoint);
   gyro_control = pid_gyro(LQR_gyro);
 
@@ -442,7 +502,7 @@ void lqr_balance_loop() {
   if (abs(LQR_u) < 5 && wrobot.joyy == 0 && abs(distance_control) < 4 && (jump_flag == 0)) {
 
     LQR_u = pid_lqr_u(LQR_u);  //Compensate for the nonlinearity of small torque
-    angle_zeropoint -= pid_zeropoint(lpf_zeropoint(distance_control));  //Center of gravity adaptive
+    //angle_zeropoint -= pid_zeropoint(lpf_zeropoint(distance_control));  //Center of gravity adaptive
   } else {
     pid_lqr_u.error_prev = 0;  //The output integral is reset to zero
   }
@@ -483,6 +543,12 @@ void robot_sitdown()
 }
 //Leg movement control
 void leg_loop() {
+
+  setPWM_Software(0, angleToPulse(0));
+  setPWM_Software(1, angleToPulse(180));
+  setPWM_Software(2, angleToPulse(180));
+  setPWM_Software(3, angleToPulse(0));
+
   /*jump_loop();
   if (jump_flag == 0)  //Not in a jumping state
   {
@@ -570,8 +636,8 @@ void web_loop() {
 
 //The yaw axis Angle accumulation function
 void yaw_angle_addup() {
-  YAW_angle = (float)mpu6050.getAngleZ();
-  YAW_gyro = (float)mpu6050.getGyroZ();
+  YAW_angle = mpu9250.getAngleZ();
+  YAW_gyro = mpu9250.getGyroZRads();
 
   if (YAW_angle_zero_point == (-10)) {
     YAW_angle_zero_point = YAW_angle;
@@ -758,4 +824,9 @@ bool ten_msec_tick(void) {
   }
 
   return 0;
+}
+
+uint16_t angleToPulse(int ang){
+  int pulse = map(ang,0, 180, SERVOMIN,SERVOMAX);
+  return pulse;
 }

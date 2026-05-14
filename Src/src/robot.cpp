@@ -9,7 +9,7 @@
 #include "cpu0_task.h"
 #include "ble.h"
 #include "web_socket_client_util.h"
-#include <MPU6050_tockn.h>
+#include <MPU9250_asukiaaa.h>
 
 int BAT_PIN = 35;
 esp_adc_cal_characteristics_t adc_chars;
@@ -427,10 +427,10 @@ void RobotProtocol::test_log_output()
   {
     case 1:
     {
-      extern MPU6050 mpu6050;
-      float x = mpu6050.getAngleX();
-      float y = mpu6050.getAngleY();
-      float z = mpu6050.getAngleZ();
+      extern MPU9250_asukiaaa mpu9250;
+      float x = mpu9250.getAngleX();
+      float y = mpu9250.getAngleY();
+      float z = mpu9250.getAngleZ();
 
       Serial.print("x:");
       Serial.print(x);
