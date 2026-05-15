@@ -58,10 +58,10 @@ MagneticSensorI2C sensor1 = MagneticSensorI2C(AS5600_I2C);
 MagneticSensorI2C sensor2 = MagneticSensorI2C(AS5600_I2C);
 
 //PID instance
-PIDController pid_angle{ .P = 50, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_gyro{ .P = 2.2, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_distance{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_speed{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_angle{ .P = 1, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_gyro{ .P = 0.06, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_distance{ .P = 0.6, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_speed{ .P = 07, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_yaw_angle{ .P = 1.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_yaw_gyro{ .P = 0.04, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_lqr_u{ .P = 1, .I = 15, .D = 0, .ramp = 100000, .limit = 8 };
@@ -180,7 +180,7 @@ float gyro_control = 0;
 float speed_control = 0;
 float distance_control = 0;
 float LQR_u = 0;
-float angle_zeropoint = -0.03;
+float angle_zeropoint = -1.48;
 float distance_zeropoint = -256.0;  //Wheel position shift zero offset \
  (-256 is an impossible displacement value, use it as a sign that it is not refreshed)
 
@@ -329,19 +329,19 @@ void setup() {
   inicializarPCA9685();
   
   // Map motor to commander
-  command.add('A', StabAngle, "pid angle");
-  command.add('B', StabGyro, "pid gyro");
-  command.add('C', StabDistance, "pid distance");
-  command.add('D', StabSpeed, "pid speed");
-  command.add('E', StabYawAngle, "pid yaw angle");
-  command.add('F', StabYawGyro, "pid yaw gyro");
-  command.add('G', lpfJoyy, "lpf joyy");
-  command.add('H', StabLqrU, "pid lqr u");
-  command.add('I', StabZeropoint, "pid zeropoint");
-  command.add('J', lpfZeropoint, "lpf zeropoint");
-  command.add('K', StabRollAngle, "pid roll angle");
-  command.add('L', lpfRoll, "lpf roll");
-  command.add('U', user_function, "user function");
+  command.add('A', StabAngle, (char*) "pid angle");
+  command.add('B', StabGyro, (char*) "pid gyro");
+  command.add('C', StabDistance, (char*) "pid distance");
+  command.add('D', StabSpeed, (char*) "pid speed");
+  command.add('E', StabYawAngle, (char*) "pid yaw angle");
+  command.add('F', StabYawGyro, (char*) "pid yaw gyro");
+  command.add('G', lpfJoyy, (char*) "lpf joyy");
+  command.add('H', StabLqrU, (char*) "pid lqr u");
+  command.add('I', StabZeropoint, (char*) "pid zeropoint");
+  command.add('J', lpfZeropoint, (char*) "lpf zeropoint");
+  command.add('K', StabRollAngle, (char*) "pid roll angle");
+  command.add('L', lpfRoll, (char*) "lpf roll");
+  command.add('U', user_function, (char*) "user function");
 
   leg_loop(); 
 
@@ -448,8 +448,8 @@ void lqr_balance_loop() {
       return; // pula este ciclo para não gerar spike
   }
 
-  LQR_angle = mpu9250.getAngleY();
-  LQR_gyro = mpu9250.getGyroYRads();
+  LQR_angle = mpu9250.getAngleY() * 180/PI;
+  LQR_gyro = mpu9250.getGyroYRads()* 180/PI;
   angle_control = pid_angle(LQR_angle - angle_zeropoint);
   gyro_control = pid_gyro(LQR_gyro);
 
@@ -636,8 +636,8 @@ void web_loop() {
 
 //The yaw axis Angle accumulation function
 void yaw_angle_addup() {
-  YAW_angle = mpu9250.getAngleZ();
-  YAW_gyro = mpu9250.getGyroZRads();
+  YAW_angle = mpu9250.getAngleZ() * 180/PI;
+  YAW_gyro = mpu9250.getGyroZRads() * 180/PI;
 
   if (YAW_angle_zero_point == (-10)) {
     YAW_angle_zero_point = YAW_angle;
