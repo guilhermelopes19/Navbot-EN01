@@ -69,14 +69,14 @@ PIDController pid_lqr_u{ .P = 1, .I = 15, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_zeropoint{ .P = 0.002, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
 PIDController pid_roll_angle{ .P = 8, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };*/
 
-PIDController pid_angle{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_gyro{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_angle{ .P = 1.2, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_gyro{ .P = 0.1, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_distance{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_speed{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_yaw_angle{ .P = 1.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_yaw_angle{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_yaw_gyro{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_lqr_u{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_zeropoint{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
+PIDController pid_zeropoint{ .P = 0.002, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
 PIDController pid_roll_angle{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };
 
 //Low pass filter instance
@@ -191,7 +191,7 @@ float gyro_control = 0;
 float speed_control = 0;
 float distance_control = 0;
 float LQR_u = 0;
-float angle_zeropoint = -2;//-1.48;
+float angle_zeropoint = 4.32;//-1.48;
 float distance_zeropoint = -256.0;  //Wheel position shift zero offset \
  (-256 is an impossible displacement value, use it as a sign that it is not refreshed)
 
@@ -381,7 +381,7 @@ void loop() {
   imu.updateMPU();    //IMU data update
 
   Serial.print("Angle y: ");
-  Serial.println(imu.getAngleY());
+  Serial.println(imu.getAngleY() * RAD2DEG);
 
   lqr_balance_loop();  //lqr self-balancing control
   yaw_loop();          //yaw axis steering control
@@ -426,7 +426,7 @@ void loop() {
     wrobot.joyx = 0;
     wrobot.joyy = 0;
     wrobot.roll = 0;
-    wrobot.height = 32;
+    wrobot.height = 70;
   }
 
   //Record the last remote control data
@@ -459,9 +459,11 @@ void lqr_balance_loop() {
   LQR_speed    = -(motor1.shaft_velocity * rp.m1_direction + motor2.shaft_velocity * rp.m2_direction);
 
   // PATCH A: inicializa distance_zeropoint no primeiro ciclo real
-  if (distance_zeropoint < -200.0f) {
+  static bool distance_initialized = false;
+  if (!distance_initialized) {
       distance_zeropoint = LQR_distance;
-      return; // pula este ciclo para não gerar spike
+      distance_initialized = true;
+      return; // pula só o primeiríssimo ciclo da vida do robô
   }
 
   LQR_angle = imu.getAngleY() * 180/PI;
@@ -518,7 +520,7 @@ void lqr_balance_loop() {
   if (abs(LQR_u) < 5 && wrobot.joyy == 0 && abs(distance_control) < 4 && (jump_flag == 0)) {
 
     LQR_u = pid_lqr_u(LQR_u);  //Compensate for the nonlinearity of small torque
-    angle_zeropoint -= pid_zeropoint(lpf_zeropoint(distance_control));  //Center of gravity adaptive
+    //angle_zeropoint -= pid_zeropoint(lpf_zeropoint(distance_control));  //Center of gravity adaptive
   } else {
     pid_lqr_u.error_prev = 0;  //The output integral is reset to zero
   }
@@ -652,8 +654,8 @@ void web_loop() {
 
 //The yaw axis Angle accumulation function
 void yaw_angle_addup() {
-  YAW_angle = imu.getAngleZ() * 180/PI;
-  YAW_gyro = imu.getGyroZRads() * 180/PI;
+  YAW_angle = imu.getAngleZ();
+  YAW_gyro = imu.getGyroZRads();
 
   if (YAW_angle_zero_point == (-10)) {
     YAW_angle_zero_point = YAW_angle;

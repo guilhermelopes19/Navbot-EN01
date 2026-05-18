@@ -2,6 +2,7 @@
 #define IMU_H
 
 #define DEG2RAD PI/180
+#define RAD2DEG 180/PI
 
 #include <MPU9250_asukiaaa.h>
 

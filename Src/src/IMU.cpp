@@ -66,7 +66,7 @@ void IMU::updateMPU() {
   // Filtro Complementar
   angleX = 0.98f * (angleX + gyroX_rads * dt) + 0.02f * accAngleX;
   angleY = 0.98f * (angleY + gyroY_rads * dt) + 0.02f * accAngleY;
-  angleZ = gyroZ_rads * dt;
+  angleZ = angleZ + gyroZ_rads * dt;
 }
 
 float IMU::getAngleX() {
