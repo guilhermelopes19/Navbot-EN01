@@ -3,7 +3,8 @@
 #include <Arduino.h>
 //#include <MPU6050_tockn.h>
 // #include "Servo_STS3032.h"
-#include <MPU9250_asukiaaa.h>
+//#include <MPU9250_asukiaaa.h>
+#include <IMU.h>
 #include <BitBang_I2C.h>
 
 //WiFi transmission header file
@@ -58,15 +59,25 @@ MagneticSensorI2C sensor1 = MagneticSensorI2C(AS5600_I2C);
 MagneticSensorI2C sensor2 = MagneticSensorI2C(AS5600_I2C);
 
 //PID instance
-PIDController pid_angle{ .P = 1, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_gyro{ .P = 0.06, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_distance{ .P = 0.6, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_speed{ .P = 07, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+/*PIDController pid_angle{ .P = 1, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_gyro{ .P = 0.5, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_distance{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_speed{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_yaw_angle{ .P = 1.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_yaw_gyro{ .P = 0.04, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_lqr_u{ .P = 1, .I = 15, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_zeropoint{ .P = 0.002, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
-PIDController pid_roll_angle{ .P = 8, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };
+PIDController pid_roll_angle{ .P = 8, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };*/
+
+PIDController pid_angle{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_gyro{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_distance{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_speed{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_yaw_angle{ .P = 1.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_yaw_gyro{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_lqr_u{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_zeropoint{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
+PIDController pid_roll_angle{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };
 
 //Low pass filter instance
 LowPassFilter lpf_joyy{ .Tf = 0.2 };
@@ -123,7 +134,7 @@ WebSocketsServer websocket = WebSocketsServer(81);  // Define a webSocket server
 int joystick_value[2];
 
 // MPU9250 instance
-MPU9250_asukiaaa mpu9250;
+IMU imu(&I2Ctwo);
 
 BBI2C bbi2c; 
 
@@ -180,7 +191,7 @@ float gyro_control = 0;
 float speed_control = 0;
 float distance_control = 0;
 float LQR_u = 0;
-float angle_zeropoint = -1.48;
+float angle_zeropoint = -2;//-1.48;
 float distance_zeropoint = -256.0;  //Wheel position shift zero offset \
  (-256 is an impossible displacement value, use it as a sign that it is not refreshed)
 
@@ -276,8 +287,9 @@ void setup() {
   // ==========================================
   // MPU9250 setup & Calibração Manual
   // ==========================================
-  mpu9250.setWire(&I2Ctwo);
-  mpu9250.calibrate();
+  //mpu9250.setWire(&I2Ctwo);
+  //mpu9250.calibrate();
+  imu.calibrate();
   // ==========================================
 
   //Connect the motor object to the encoder object
@@ -319,8 +331,8 @@ void setup() {
   motor2.init();
   motor2.initFOC();
 
-  rp.m1_direction = motor1.sensor_direction == CW?  -0.5 : 0.5;
-  rp.m2_direction = motor2.sensor_direction == CCW? -0.5 : 0.5;
+  rp.m1_direction = motor1.sensor_direction == CW?  -1 : 1;
+  rp.m2_direction = motor2.sensor_direction == CCW? -1 : 1;
 
   Serial.println("Motor1 direction:" + String(rp.m1_direction));
   Serial.println("Motor2 direction:" + String(rp.m2_direction));
@@ -355,7 +367,7 @@ void loop() {
     bat_check();  //Voltage detection
     wifi_loop();
     static int ttss;
-    Serial.println(ttss++);
+    //Serial.println(ttss++);
   }
   if (ten_msec_tick()) {
     ble_loop();
@@ -366,13 +378,17 @@ void loop() {
 
   web_loop();  //Web data update
 
-  mpu9250.updateMPU();    //IMU data update
+  imu.updateMPU();    //IMU data update
+
+  Serial.print("Angle y: ");
+  Serial.println(imu.getAngleY());
+
   lqr_balance_loop();  //lqr self-balancing control
   yaw_loop();          //yaw axis steering control
 
   //The self-balancing calculated output torque is assigned to the motor
-  motor1.target = (-0.5) * (LQR_u + YAW_output) * rp.m1_direction;
-  motor2.target = (-0.5) * (LQR_u - YAW_output) * rp.m2_direction;
+  motor1.target = -(LQR_u + YAW_output) * rp.m1_direction;
+  motor2.target = -(LQR_u - YAW_output) * rp.m2_direction;
   //motor1.target = (LQR_u + YAW_output) * rp.m1_direction;
   //motor2.target = (LQR_u - YAW_output) * rp.m2_direction;
  
@@ -448,8 +464,8 @@ void lqr_balance_loop() {
       return; // pula este ciclo para não gerar spike
   }
 
-  LQR_angle = mpu9250.getAngleY() * 180/PI;
-  LQR_gyro = mpu9250.getGyroYRads()* 180/PI;
+  LQR_angle = imu.getAngleY() * 180/PI;
+  LQR_gyro = imu.getGyroYRads()* 180/PI;
   angle_control = pid_angle(LQR_angle - angle_zeropoint);
   gyro_control = pid_gyro(LQR_gyro);
 
@@ -502,7 +518,7 @@ void lqr_balance_loop() {
   if (abs(LQR_u) < 5 && wrobot.joyy == 0 && abs(distance_control) < 4 && (jump_flag == 0)) {
 
     LQR_u = pid_lqr_u(LQR_u);  //Compensate for the nonlinearity of small torque
-    //angle_zeropoint -= pid_zeropoint(lpf_zeropoint(distance_control));  //Center of gravity adaptive
+    angle_zeropoint -= pid_zeropoint(lpf_zeropoint(distance_control));  //Center of gravity adaptive
   } else {
     pid_lqr_u.error_prev = 0;  //The output integral is reset to zero
   }
@@ -636,8 +652,8 @@ void web_loop() {
 
 //The yaw axis Angle accumulation function
 void yaw_angle_addup() {
-  YAW_angle = mpu9250.getAngleZ() * 180/PI;
-  YAW_gyro = mpu9250.getGyroZRads() * 180/PI;
+  YAW_angle = imu.getAngleZ() * 180/PI;
+  YAW_gyro = imu.getGyroZRads() * 180/PI;
 
   if (YAW_angle_zero_point == (-10)) {
     YAW_angle_zero_point = YAW_angle;
@@ -703,7 +719,7 @@ void bat_check() {
     uint32_t voltage = esp_adc_cal_raw_to_voltage(sum, &adc_chars);
     rp.battery_voltage = (voltage * 4) / 1000.0;
 
-    Serial.println(rp.battery_voltage);
+    //Serial.println(rp.battery_voltage);
     //Battery display
     bat_check_num = 0;
   } else
