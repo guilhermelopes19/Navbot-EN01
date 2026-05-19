@@ -37,36 +37,45 @@ void IMU::calibrate() {
 }
 
 void IMU::updateMPU() {
-  mpu9250.accelUpdate();
-  mpu9250.gyroUpdate();
+    mpu9250.accelUpdate();
+    mpu9250.gyroUpdate();
 
-  float aX = mpu9250.accelX();
-  float aY = mpu9250.accelY();
-  float aZ = mpu9250.accelZ();
+    float aX = mpu9250.accelX();
+    float aY = mpu9250.accelY();
+    float aZ = mpu9250.accelZ();
 
-  // Cálculo de ângulo via acelerômetro
-  //float accAngleX = atan2(aY, aZ) * 180.0 / PI;
-  //float accAngleY = atan2(-aX, sqrt(aY * aY + aZ * aZ)) * 180.0 / PI;
-  float accAngleX = atan2(aY, aZ);
-  float accAngleY = atan2(-aX, sqrt(aY * aY + aZ * aZ));
+    // --- NOVO: Filtro passa-baixa no acelerômetro ANTES do complementar ---
+    // Elimina vibração de alta frequência dos motores
+    // Tf=0.05s → corte em ~3.2Hz, muito abaixo da freq. de vibração dos motores
+    static float aX_f = 0, aY_f = 0, aZ_f = 0;
+    
+    unsigned long now = micros();
+    float dt = (now - lastMpuUpdateTime) / 1000000.0f;
+    lastMpuUpdateTime = now;
+    if (dt > 0.5f || dt <= 0.0f) dt = 0.005f;
 
-  // gyro do MPU9250: padrão é 131 LSB/(°/s) no range ±250°/s
-  // A biblioteca já entrega em °/s — converte para rad/s:
-  gyroX_rads = (mpu9250.gyroX() - gyroXoffset) * DEG2RAD;
-  gyroY_rads = (mpu9250.gyroY() - gyroYoffset) * DEG2RAD;
-  gyroZ_rads = (mpu9250.gyroZ() - gyroZoffset) * DEG2RAD;
+    // Constante do filtro: alpha = dt / (Tf + dt)  com Tf = 0.05s
+    float Tf_acc = 0.05f;
+    float alpha_acc = dt / (Tf_acc + dt);
+    aX_f += alpha_acc * (aX - aX_f);
+    aY_f += alpha_acc * (aY - aY_f);
+    aZ_f += alpha_acc * (aZ - aZ_f);
 
-  // Aplica offset no giroscópio
+    // Usa acelerômetro filtrado para calcular ângulo
+    float accAngleX = atan2(aY_f, aZ_f);
+    float accAngleY = atan2(-aX_f, sqrt(aY_f * aY_f + aZ_f * aZ_f));
 
-  unsigned long now = micros();
-  float dt = (now - lastMpuUpdateTime) / 1000000.0; // Divide por 1 milhão para ter segundos
-  lastMpuUpdateTime = now;
+    // Converte giroscópio para rad/s
+    gyroX_rads = (mpu9250.gyroX() - gyroXoffset) * DEG2RAD;
+    gyroY_rads = (mpu9250.gyroY() - gyroYoffset) * DEG2RAD;
+    gyroZ_rads = (mpu9250.gyroZ() - gyroZoffset) * DEG2RAD;
 
-  
-  // Filtro Complementar
-  angleX = 0.98f * (angleX + gyroX_rads * dt) + 0.02f * accAngleX;
-  angleY = 0.98f * (angleY + gyroY_rads * dt) + 0.02f * accAngleY;
-  angleZ = angleZ + gyroZ_rads * dt;
+    // Filtro complementar — reduz peso do acelerômetro de 0.02 para 0.005
+    // 0.02 era adequado para loops lentos (~100Hz); a ~1000Hz o acelerômetro
+    // tem influência excessiva somada ao ruído de vibração
+    angleX = 0.995f * (angleX + gyroX_rads * dt) + 0.005f * accAngleX;
+    angleY = 0.995f * (angleY + gyroY_rads * dt) + 0.005f * accAngleY;
+    angleZ += gyroZ_rads * dt;
 }
 
 float IMU::getAngleX() {

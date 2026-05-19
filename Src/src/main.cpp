@@ -69,13 +69,13 @@ PIDController pid_lqr_u{ .P = 1, .I = 15, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_zeropoint{ .P = 0.002, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
 PIDController pid_roll_angle{ .P = 8, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };*/
 
-PIDController pid_angle{ .P = 1.2, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_gyro{ .P = 0.1, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_angle{ .P = 30, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_gyro{ .P = 2, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_distance{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_speed{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_yaw_angle{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_yaw_gyro{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_lqr_u{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_lqr_u{ .P = 1, .I = 15, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_zeropoint{ .P = 0.002, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
 PIDController pid_roll_angle{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };
 
@@ -191,7 +191,7 @@ float gyro_control = 0;
 float speed_control = 0;
 float distance_control = 0;
 float LQR_u = 0;
-float angle_zeropoint = 4.32;//-1.48;
+float angle_zeropoint = 1.62 * DEG2RAD;//-1.48;
 float distance_zeropoint = -256.0;  //Wheel position shift zero offset \
  (-256 is an impossible displacement value, use it as a sign that it is not refreshed)
 
@@ -331,8 +331,8 @@ void setup() {
   motor2.init();
   motor2.initFOC();
 
-  rp.m1_direction = motor1.sensor_direction == CW?  -1 : 1;
-  rp.m2_direction = motor2.sensor_direction == CCW? -1 : 1;
+  rp.m1_direction = motor1.sensor_direction == CW?  -0.5 : 0.5;
+  rp.m2_direction = motor2.sensor_direction == CCW? -0.5 : 0.5;
 
   Serial.println("Motor1 direction:" + String(rp.m1_direction));
   Serial.println("Motor2 direction:" + String(rp.m2_direction));
@@ -373,15 +373,15 @@ void loop() {
     ble_loop();
     bat_led_blink();  //Voltage indication LED light
     rp.test_log_output();
-    
+    Serial.print("Angle y: ");
+    Serial.println(imu.getAngleY() * RAD2DEG);
   }
 
   web_loop();  //Web data update
 
   imu.updateMPU();    //IMU data update
 
-  Serial.print("Angle y: ");
-  Serial.println(imu.getAngleY() * RAD2DEG);
+  
 
   lqr_balance_loop();  //lqr self-balancing control
   yaw_loop();          //yaw axis steering control
@@ -459,15 +459,15 @@ void lqr_balance_loop() {
   LQR_speed    = -(motor1.shaft_velocity * rp.m1_direction + motor2.shaft_velocity * rp.m2_direction);
 
   // PATCH A: inicializa distance_zeropoint no primeiro ciclo real
-  static bool distance_initialized = false;
+  /*static bool distance_initialized = false;
   if (!distance_initialized) {
       distance_zeropoint = LQR_distance;
       distance_initialized = true;
       return; // pula só o primeiríssimo ciclo da vida do robô
-  }
+  }*/
 
-  LQR_angle = imu.getAngleY() * 180/PI;
-  LQR_gyro = imu.getGyroYRads()* 180/PI;
+  LQR_angle = imu.getAngleY();
+  LQR_gyro = imu.getGyroYRads();
   angle_control = pid_angle(LQR_angle - angle_zeropoint);
   gyro_control = pid_gyro(LQR_gyro);
 
@@ -520,18 +520,20 @@ void lqr_balance_loop() {
   if (abs(LQR_u) < 5 && wrobot.joyy == 0 && abs(distance_control) < 4 && (jump_flag == 0)) {
 
     LQR_u = pid_lqr_u(LQR_u);  //Compensate for the nonlinearity of small torque
-    //angle_zeropoint -= pid_zeropoint(lpf_zeropoint(distance_control));  //Center of gravity adaptive
+    angle_zeropoint -= pid_zeropoint(lpf_zeropoint(distance_control));  //Center of gravity adaptive
   } else {
     pid_lqr_u.error_prev = 0;  //The output integral is reset to zero
   }
 
   //The balance control parameters are adaptive
-  if (wrobot.height < 50) {
-    pid_speed.P = 0.7;
-  } else if (wrobot.height < 64) {
-    pid_speed.P = 0.6;
-  } else {
-    pid_speed.P = 0.5;
+  if(pid_speed.P > 0) {
+    if (wrobot.height < 50) {
+      pid_speed.P = 0.7;
+    } else if (wrobot.height < 64) {
+      pid_speed.P = 0.6;
+    } else {
+      pid_speed.P = 0.5;
+    }
   }
 }
 void robot_sitdown()
