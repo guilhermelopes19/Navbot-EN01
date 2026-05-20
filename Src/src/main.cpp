@@ -60,16 +60,26 @@ MagneticSensorI2C sensor2 = MagneticSensorI2C(AS5600_I2C);
 
 //PID instance
 /*PIDController pid_angle{ .P = 1, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_gyro{ .P = 0.5, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_distance{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_speed{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_gyro{ .P = 0.06, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_distance{ .P = 0.5, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_speed{ .P = 0.7, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_yaw_angle{ .P = 1.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_yaw_gyro{ .P = 0.04, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_lqr_u{ .P = 1, .I = 15, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_zeropoint{ .P = 0.002, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
 PIDController pid_roll_angle{ .P = 8, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };*/
 
-PIDController pid_angle{ .P = 30, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_angle{ .P = 50.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_gyro{ .P = 4.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_distance{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
+PIDController pid_speed{ .P = 0.51, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_yaw_angle{ .P = 1.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_yaw_gyro{ .P = 0.7, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_lqr_u{ .P = 1, .I = 30, .D = 0, .ramp = 100000, .limit = 8 };
+PIDController pid_zeropoint{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
+PIDController pid_roll_angle{ .P = 8, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };
+
+/*PIDController pid_angle{ .P = 30, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_gyro{ .P = 2, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_distance{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_speed{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
@@ -77,7 +87,7 @@ PIDController pid_yaw_angle{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 
 PIDController pid_yaw_gyro{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_lqr_u{ .P = 1, .I = 15, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_zeropoint{ .P = 0.002, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
-PIDController pid_roll_angle{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };
+PIDController pid_roll_angle{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };*/
 
 //Low pass filter instance
 LowPassFilter lpf_joyy{ .Tf = 0.2 };
@@ -191,7 +201,7 @@ float gyro_control = 0;
 float speed_control = 0;
 float distance_control = 0;
 float LQR_u = 0;
-float angle_zeropoint = 1.62 * DEG2RAD;//-1.48;
+float angle_zeropoint = 0.9522 * DEG2RAD;//-1.48; 1.62
 float distance_zeropoint = -256.0;  //Wheel position shift zero offset \
  (-256 is an impossible displacement value, use it as a sign that it is not refreshed)
 
@@ -373,8 +383,8 @@ void loop() {
     ble_loop();
     bat_led_blink();  //Voltage indication LED light
     rp.test_log_output();
-    Serial.print("Angle y: ");
-    Serial.println(imu.getAngleY() * RAD2DEG);
+    //Serial.print("Angle y: ");
+    //Serial.println(imu.getAngleY() * RAD2DEG);
   }
 
   web_loop();  //Web data update
@@ -526,7 +536,7 @@ void lqr_balance_loop() {
   }
 
   //The balance control parameters are adaptive
-  if(pid_speed.P > 0) {
+  /*if(pid_speed.P > 0) {
     if (wrobot.height < 50) {
       pid_speed.P = 0.7;
     } else if (wrobot.height < 64) {
@@ -534,7 +544,7 @@ void lqr_balance_loop() {
     } else {
       pid_speed.P = 0.5;
     }
-  }
+  }*/
 }
 void robot_sitdown()
 {
