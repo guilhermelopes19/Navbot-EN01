@@ -5,7 +5,8 @@
 // #include "Servo_STS3032.h"
 //#include <MPU9250_asukiaaa.h>
 #include <IMU.h>
-#include <BitBang_I2C.h>
+//#include <BitBang_I2C.h>
+#include <Servos.h>
 
 //WiFi transmission header file
 #include <WebSocketsServer.h>
@@ -71,13 +72,13 @@ PIDController pid_roll_angle{ .P = 8, .I = 0, .D = 0, .ramp = 100000, .limit = 4
 
 PIDController pid_angle{ .P = 50.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_gyro{ .P = 4.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_distance{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
+PIDController pid_distance{ .P = 0.3, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
 PIDController pid_speed{ .P = 0.51, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_yaw_angle{ .P = 1.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_yaw_gyro{ .P = 0.7, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_lqr_u{ .P = 1, .I = 30, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_zeropoint{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
-PIDController pid_roll_angle{ .P = 8, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };
+PIDController pid_zeropoint{ .P = 0.00003508771, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
+PIDController pid_roll_angle{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };
 
 /*PIDController pid_angle{ .P = 30, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_gyro{ .P = 2, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
@@ -143,50 +144,11 @@ WebServer webserver;                                // server
 WebSocketsServer websocket = WebSocketsServer(81);  // Define a webSocket server to process messages sent by clients
 int joystick_value[2];
 
-// MPU9250 instance
+// MPU6500 instance
 IMU imu(&I2Ctwo);
 
-BBI2C bbi2c; 
-
-// Função que configura o PCA9685 manualmente nos pinos 21 e 4
-void inicializarPCA9685() {
-  // 1. Configura os pinos do I2C
-  memset(&bbi2c, 0, sizeof(bbi2c));
-  bbi2c.bWire = 0; // 0 significa usar os pinos digitais (BitBang)
-  bbi2c.iSDA = 21; // Seu pino SDA
-  bbi2c.iSCL = 4;  // Seu pino SCL
-  I2CInit(&bbi2c, 100000); // Velocidade de 100kHz
-
-  // 2. Configura o PCA9685 para servos (50Hz)
-  uint8_t sleep_cmd[2] = {0x00, 0x10}; // Coloca o chip em sleep para mudar a frequência
-  I2CWrite(&bbi2c, 0x40, sleep_cmd, 2);
-
-  uint8_t prescale_cmd[2] = {0xFE, 121}; // Define a frequência para ~50Hz
-  I2CWrite(&bbi2c, 0x40, prescale_cmd, 2);
-
-  uint8_t wake_cmd[2] = {0x00, 0x00}; // Acorda o chip
-  I2CWrite(&bbi2c, 0x40, wake_cmd, 2);
-  delay(5);
-
-  uint8_t mode_cmd[2] = {0x00, 0xA1}; // Liga o Auto-Incremento para escrita rápida
-  I2CWrite(&bbi2c, 0x40, mode_cmd, 2);
-}
-
-// Função que substitui a 'board1.setPWM' da Adafruit
-void setPWM_Software(uint8_t servo_num, uint16_t pulse) {
-  uint8_t base_reg = 0x06 + (4 * servo_num); // Descobre o registrador do motor desejado
-  
-  // Monta o pacote de dados (inicia em 0, termina no valor do pulso)
-  uint8_t data[5];
-  data[0] = base_reg;
-  data[1] = 0x00;                 // Tempo ON LSB
-  data[2] = 0x00;                 // Tempo ON MSB
-  data[3] = pulse & 0xFF;         // Tempo OFF LSB
-  data[4] = (pulse >> 8) & 0xFF;  // Tempo OFF MSB
-  
-  // Envia via I2C de Software
-  I2CWrite(&bbi2c, 0x40, data, 5);
-}
+// PCA9685 instance
+Servos board;
 
 /************parameter definition*************/
 #define pi 3.1415927
@@ -348,7 +310,7 @@ void setup() {
   Serial.println("Motor2 direction:" + String(rp.m2_direction));
 
   // Setup pca9685
-  inicializarPCA9685();
+  board.inicializarPCA9685();
   
   // Map motor to commander
   command.add('A', StabAngle, (char*) "pid angle");
@@ -385,6 +347,13 @@ void loop() {
     rp.test_log_output();
     //Serial.print("Angle y: ");
     //Serial.println(imu.getAngleY() * RAD2DEG);
+
+    static int leg_prescaler = 0;
+    leg_prescaler++;
+    if(leg_prescaler >= 4) {
+      leg_loop(); 
+      leg_prescaler = 0;
+    }
   }
 
   web_loop();  //Web data update
@@ -406,12 +375,12 @@ void loop() {
 
   //Shut down output after falling out of control
   
-  if (abs(LQR_angle) > rp.uncontrollable_angle) {
+  if (abs(LQR_angle) > rp.uncontrollable_angle * DEG2RAD) {
     rp.uncontrollable = 1;
   }
   if (rp.uncontrollable != 0)  //Delay recovery after lifting
   {
-    if (abs(LQR_angle) < rp.recovery_angle) {
+    if (abs(LQR_angle) < rp.recovery_angle * DEG2RAD) {
       rp.uncontrollable++;
     }
     if (rp.uncontrollable > 200)  //The delay time of 200 program cycles
@@ -504,7 +473,7 @@ void lqr_balance_loop() {
 
   //Calculate displacement control output
   distance_control = pid_distance(LQR_distance - distance_zeropoint);
-  speed_control = pid_speed(LQR_speed - 0.1 * lpf_joyy(wrobot.joyy));
+  speed_control = pid_speed(LQR_speed - 0.07 * lpf_joyy(wrobot.joyy));
 
   //Wheel lift detection
   robot_speed_last = robot_speed;  //Record two consecutive wheel speeds
@@ -574,10 +543,76 @@ void robot_sitdown()
 //Leg movement control
 void leg_loop() {
 
-  setPWM_Software(0, angleToPulse(0));
-  setPWM_Software(1, angleToPulse(180));
-  setPWM_Software(2, angleToPulse(180));
-  setPWM_Software(3, angleToPulse(0));
+  // 1. Roll em graus (mesma lógica)
+  float roll_angle_deg = (imu.getAngleX() + rp.offset_roll) * RAD2DEG;
+  leg_position_add = pid_roll_angle(lpf_roll(roll_angle_deg));
+
+  // 2. Altura
+  float max_height = 72.0f; 
+  float flex_angle = (max_height - wrobot.height) * 1.2f; 
+  if (flex_angle < 0) flex_angle = 0;
+
+  // 3. Alvo final (Flexão + Equilíbrio Lateral)
+  float left_leg_flex  = flex_angle - leg_position_add;
+  float right_leg_flex = flex_angle + leg_position_add;
+
+  // Limite de curso (evita partir a peça)
+  left_leg_flex  = constrain(left_leg_flex, 0, 60);
+  right_leg_flex = constrain(right_leg_flex, 0, 60);
+
+  // 4. A LÓGICA ESPELHADA (Inspirada no en02)
+  // Definimos a direção de cada servo baseada no seu (0, 180, 180, 0)
+  // Se o servo 0 precisa de somar para dobrar, o servo 1 precisa de subtrair!
+  int dir_s0 = 1;  // Para dobrar, vai em direção aos 90
+  int dir_s1 = -1; // Para dobrar, desce do 180 em direção aos 90
+  int dir_s2 = -1; // Espelho do S1
+  int dir_s3 = 1;  // Espelho do S0
+
+  board.setPWM_Software(0, angleToPulse(0   + (left_leg_flex  * dir_s0)));
+  board.setPWM_Software(1, angleToPulse(180 + (left_leg_flex  * dir_s1)));
+  
+  board.setPWM_Software(2, angleToPulse(180 + (right_leg_flex * dir_s2)));
+  board.setPWM_Software(3, angleToPulse(0   + (right_leg_flex * dir_s3)));
+
+  /*// 1. O Pêndulo Lateral (Roll) - Evita que o robô caia de lado
+  // Convertendo radianos para graus para o pid_roll_angle (P=8) ter força real
+  float roll_angle_deg = (imu.getAngleX() + rp.offset_roll) * RAD2DEG;
+  leg_position_add = pid_roll_angle(lpf_roll(roll_angle_deg));
+
+  // 2. A Altura (Sit/Stand) baseado em pernas totalmente esticadas no topo
+  // O wrobot.height padrão em pé é ~70, e sentado é 32.
+  // Se a altura for máxima (ex: 72), a flexão é 0 (perna esticada).
+  // Se a altura cair para 32, a flexão aumenta para dobrar a perna.
+  float max_height = 72.0f; 
+  float flex_angle = (max_height - wrobot.height) * 1.0f; // 1 grau por unidade de altura
+  if (flex_angle < 0) flex_angle = 0; // Trava de segurança
+
+  // 3. Combinando a flexão de altura com a compensação do Roll
+  // Se o robô cair para a esquerda, leg_position_add fica positivo.
+  // Queremos que a perna esquerda estique (flexione MENOS) -> subtrai leg_position_add
+  // Queremos que a perna direita encolha (flexione MAIS) -> soma leg_position_add
+  float left_leg_flex  = flex_angle - leg_position_add;
+  float right_leg_flex = flex_angle + leg_position_add;
+
+  // 4. Limites de segurança para não forçar a estrutura mecânica (ex: máx 70 graus de dobra)
+  left_leg_flex  = constrain(left_leg_flex, 0, 70);
+  right_leg_flex = constrain(right_leg_flex, 0, 70);
+
+  // 5. Acionando os 4 Servos via PCA9685
+  // Como (0, 180, 180, 0) é esticada, a flexão afasta o servo desse ponto:
+
+  // PERNA ESQUERDA (Pinos 0 e 1)
+  board.setPWM_Software(0, angleToPulse(0   + left_leg_flex));
+  board.setPWM_Software(1, angleToPulse(180 - left_leg_flex));
+
+  // PERNA DIREITA (Pinos 2 e 3)
+  board.setPWM_Software(2, angleToPulse(180 - right_leg_flex));
+  board.setPWM_Software(3, angleToPulse(0   + right_leg_flex));
+
+  /*board.setPWM_Software(0, angleToPulse(0));
+  board.setPWM_Software(1, angleToPulse(180));
+  board.setPWM_Software(2, angleToPulse(180));
+  board.setPWM_Software(3, angleToPulse(0));*/
 
   /*jump_loop();
   if (jump_flag == 0)  //Not in a jumping state
@@ -649,7 +684,7 @@ void yaw_loop() {
   //YAW_output = 0.03*(YAW_Kp*YAW_angle_total + YAW_Kd*YAW_gyro);
   yaw_angle_addup();
 
-  YAW_angle_total += wrobot.joyx * 0.002;
+  YAW_angle_total += (wrobot.joyx * 0.01) * DEG2RAD;
   float yaw_angle_control = pid_yaw_angle(YAW_angle_total);
   float yaw_gyro_control = pid_yaw_gyro(YAW_gyro);
   YAW_output = yaw_angle_control + yaw_gyro_control;

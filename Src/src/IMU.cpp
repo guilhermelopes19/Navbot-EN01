@@ -73,8 +73,8 @@ void IMU::updateMPU() {
     // Filtro complementar — reduz peso do acelerômetro de 0.02 para 0.005
     // 0.02 era adequado para loops lentos (~100Hz); a ~1000Hz o acelerômetro
     // tem influência excessiva somada ao ruído de vibração
-    angleX = 0.995f * (angleX + gyroX_rads * dt) + 0.005f * accAngleX;
-    angleY = 0.995f * (angleY + gyroY_rads * dt) + 0.005f * accAngleY;
+    angleX = 0.995f * (angleX + gyroX_rads * dt) + 0.001f * accAngleX;/*0.005*/
+    angleY = 0.995f * (angleY + gyroY_rads * dt) + 0.001f * accAngleY;
     angleZ += gyroZ_rads * dt;
 }
 
