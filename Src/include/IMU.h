@@ -5,15 +5,18 @@
 #define RAD2DEG (180/PI)
 
 #include <MPU9250_asukiaaa.h>
-#include <MahonyFilter.h>
 
 class IMU{
     private:
         MPU9250_asukiaaa mpu9250;
-        MahonyFilter mahonyFilter;
+
         float angleX, angleY, angleZ;
-        float gyroX_rads, gyroY_rads, gyroZ_rads;
+        float gyroX, gyroY, gyroZ;
         float gyroXoffset, gyroYoffset, gyroZoffset;
+
+        float accCoef = 0.02f;
+        float gyroCoef = 0.98f;
+
         unsigned long lastMpuUpdateTime;
 
     public:
@@ -25,9 +28,9 @@ class IMU{
         float getAngleY();
         float getAngleZ();
 
-        float getGyroXRads();
-        float getGyroYRads();
-        float getGyroZRads();
+        float getGyroX();
+        float getGyroY();
+        float getGyroZ();
 
         void calibrate();
 };

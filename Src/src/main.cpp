@@ -77,7 +77,7 @@ PIDController pid_speed{ .P = 0.51, .I = 0, .D = 0, .ramp = 100000, .limit = 8 }
 PIDController pid_yaw_angle{ .P = 1.0, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_yaw_gyro{ .P = 0.7, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
 PIDController pid_lqr_u{ .P = 1, .I = 30, .D = 0, .ramp = 100000, .limit = 8 };
-PIDController pid_zeropoint{ .P = 0.00003508771f, .I = 0, .D = 0, .ramp = 100000, .limit = 4 };
+PIDController pid_zeropoint{ .P = 0.00003508771f, .I = 0, .D = 0, .ramp = 100000, .limit = 4 }; // 
 PIDController pid_roll_angle{ .P = 0, .I = 0, .D = 0, .ramp = 100000, .limit = 450 };
 
 /*PIDController pid_angle{ .P = 30, .I = 0, .D = 0, .ramp = 100000, .limit = 8 };
@@ -345,8 +345,8 @@ void loop() {
     ble_loop();
     bat_led_blink();  //Voltage indication LED light
     rp.test_log_output();
-    Serial.print("Angle y: ");
-    Serial.println(imu.getAngleY() * RAD2DEG);
+    //Serial.print("Angle y: ");
+    //Serial.println(imu.getAngleY() * RAD2DEG);
 
     static int leg_prescaler = 0;
     leg_prescaler++;
@@ -405,7 +405,7 @@ void loop() {
     wrobot.joyx = 0;
     wrobot.joyy = 0;
     wrobot.roll = 0;
-    wrobot.height = 70;
+    wrobot.height = 32;
   }
 
   //Record the last remote control data
@@ -446,7 +446,7 @@ void lqr_balance_loop() {
   }*/
 
   LQR_angle = imu.getAngleY();
-  LQR_gyro = imu.getGyroYRads();
+  LQR_gyro = imu.getGyroY();
   angle_control = pid_angle(LQR_angle - angle_zeropoint);
   gyro_control = pid_gyro(LQR_gyro);
 
@@ -702,7 +702,7 @@ void web_loop() {
 //The yaw axis Angle accumulation function
 void yaw_angle_addup() {
   YAW_angle = imu.getAngleZ();
-  YAW_gyro = imu.getGyroZRads();
+  YAW_gyro = imu.getGyroZ();
 
   if (YAW_angle_zero_point == (-10)) {
     YAW_angle_zero_point = YAW_angle;

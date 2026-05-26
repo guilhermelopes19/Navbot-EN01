@@ -4,16 +4,15 @@ IMU::IMU(TwoWire *i2c) {
     angleX = 0;
     angleY = 0;
     angleZ = 0;
-    gyroX_rads = 0; 
-    gyroY_rads = 0;
-    gyroZ_rads = 0;
+    gyroX = 0; 
+    gyroY = 0;
+    gyroZ = 0;
     gyroXoffset = 0; 
     gyroYoffset = 0; 
     gyroZoffset = 0;
     lastMpuUpdateTime = 0;
 
     mpu9250.setWire(i2c);
-    mahonyFilter = MahonyFilter(2.0f, 0.0f);
 }
 
 void IMU::calibrate() {
@@ -23,7 +22,7 @@ void IMU::calibrate() {
   Serial.println("Calibrando Giroscópio (não mova o robô)...");
   float sumX = 0, sumY = 0, sumZ = 0;
 
-  int amo = 5000;
+  int amo = 2000;
 
   for(int i = 0; i < amo; i++) {
     mpu9250.gyroUpdate();
@@ -32,10 +31,13 @@ void IMU::calibrate() {
     sumZ += mpu9250.gyroZ();
     delay(1);
   }
+
   gyroXoffset = sumX / (float) amo;
   gyroYoffset = sumY / (float) amo;
   gyroZoffset = sumZ / (float) amo;
+
   lastMpuUpdateTime = micros();
+
   Serial.println("Calibração concluída!");
 }
 
@@ -47,9 +49,9 @@ void IMU::updateMPU() {
     float aY = mpu9250.accelY();
     float aZ = mpu9250.accelZ();
 
-    gyroX_rads = (mpu9250.gyroX() - gyroXoffset) * DEG2RAD;
-    gyroY_rads = (mpu9250.gyroY() - gyroYoffset) * DEG2RAD;
-    gyroZ_rads = (mpu9250.gyroZ() - gyroZoffset) * DEG2RAD;
+    gyroX = (mpu9250.gyroX() - gyroXoffset) * DEG2RAD;
+    gyroY = (mpu9250.gyroY() - gyroYoffset) * DEG2RAD;
+    gyroZ = (mpu9250.gyroZ() - gyroZoffset) * DEG2RAD;
 
     /*// --- NOVO: Filtro passa-baixa no acelerômetro ANTES do complementar ---
     // Elimina vibração de alta frequência dos motores
@@ -61,12 +63,14 @@ void IMU::updateMPU() {
     lastMpuUpdateTime = now;
     if (dt > 0.5f || dt <= 0.0f) dt = 0.005f;
 
-    mahonyFilter.update(gyroX_rads, gyroY_rads, gyroZ_rads, aX, aY, aZ, dt);
+    
+    float angleAccX = atan2(aY, sqrt(aX * aX + aZ * aZ));
+    float angleAccY = atan2(-aX, sqrt(aY * aY + aZ * aZ));
 
-    float q0, q1, q2, q3;
-    mahonyFilter.getQuaternion(q0, q1, q2, q3);
-
-    quaternionToEuler(q0, q1, q2, q3, &angleX, &angleY, &angleZ);
+    // 5. O Filtro Complementar Clássico (Exatamente a matemática do tockn)
+    angleX = 0.995f * (gyroCoef * (angleX + gyroX * dt)) + 0.001f * (accCoef * angleAccX);
+    angleY = 0.995f * (gyroCoef * (angleY + gyroY * dt)) + 0.001f * (accCoef * angleAccY);
+    angleZ += gyroZ * dt; // O eixo Z usa apenas o giroscópio (Yaw)
 
     /*angleX *= DEG2RAD;
     angleY *= DEG2RAD;
@@ -106,14 +110,14 @@ float IMU::getAngleZ() {
   return angleZ;
 }
 
-float IMU::getGyroXRads() {
-  return gyroX_rads;
+float IMU::getGyroX() {
+  return gyroX;
 }
 
-float IMU::getGyroYRads() {
-  return gyroY_rads;
+float IMU::getGyroY() {
+  return gyroY;
 }
 
-float IMU::getGyroZRads() {
-  return gyroZ_rads;
+float IMU::getGyroZ() {
+  return gyroZ;
 }
